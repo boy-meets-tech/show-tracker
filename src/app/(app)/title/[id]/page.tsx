@@ -1,15 +1,16 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { removeEntry, setStatus } from "@/app/actions";
+import { removeEntry } from "@/app/actions";
 import { Avatar } from "@/components/Avatar";
 import { Poster } from "@/components/Poster";
 import { RatingPicker } from "@/components/RatingPicker";
 import { RecommendForm } from "@/components/RecommendForm";
+import { StatusPicker } from "@/components/StatusPicker";
 import { Card, Skeleton } from "@/components/Section";
 import { getMe } from "@/lib/auth";
 import { listFriends } from "@/lib/friends";
-import { STATUSES, STATUS_LABEL, type WatchStatus } from "@/lib/labels";
+import { STATUS_LABEL, type WatchStatus } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
 import { getTitleDetails } from "@/lib/tmdb";
 import type { ProfileRow } from "@/lib/types";
@@ -110,8 +111,6 @@ async function Social({ titleId }: { titleId: string }) {
   const recommendedToMe = recRows.filter((r) => r.to_id === me.id);
   const alreadySentTo = new Set(recRows.filter((r) => r.from_id === me.id).map((r) => r.to_id));
 
-  const setStatusFor = setStatus.bind(null, titleId);
-
   return (
     <>
       {recommendedToMe.length ? (
@@ -129,19 +128,7 @@ async function Social({ titleId }: { titleId: string }) {
       ) : null}
 
       <Card title="Your status">
-        <form action={setStatusFor} className="flex flex-wrap gap-2">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              name="status"
-              value={s}
-              className={mine?.status === s ? "btn-primary" : "btn-secondary"}
-              aria-pressed={mine?.status === s}
-            >
-              {STATUS_LABEL[s]}
-            </button>
-          ))}
-        </form>
+        <StatusPicker titleId={titleId} status={mine?.status ?? null} />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <RatingPicker titleId={titleId} rating={mine?.rating ?? null} />
           {mine ? (

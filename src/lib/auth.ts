@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export type Profile = {
@@ -12,6 +13,9 @@ export type Profile = {
 // The signed-in user's profile. Reads the session, so call it only from
 // components inside a <Suspense> boundary, or from Server Actions.
 export const getMe = cache(async (): Promise<Profile> => {
+  // Supabase checks token expiry with the current time, so this must run per
+  // request rather than in a prerender.
+  await connection();
   const supabase = await createClient();
   const {
     data: { user },
