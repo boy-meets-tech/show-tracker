@@ -5,6 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { Card, Skeleton } from "@/components/Section";
 import { getMe } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const metadata = { title: "You're invited" };
 
@@ -60,7 +61,7 @@ async function Invite({ params, searchParams }: PageProps<"/invite/[code]">) {
           You&apos;ll see what each other are watching and can swap recommendations.
         </p>
         <form action={acceptInvite.bind(null, code)} className="mt-6">
-          <button className="btn-primary px-6 py-2.5">Accept invite</button>
+          <SubmitButton className="btn-primary px-6 py-2.5" pendingText="Joining…">Accept invite</SubmitButton>
         </form>
       </div>
     </Card>

@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { getMe } from "@/lib/auth";
+import { getMyId } from "@/lib/auth";
 import { isStatus } from "@/lib/labels";
 import {
   notify,
@@ -44,7 +44,7 @@ async function ensureTitle(id: string) {
 }
 
 export async function setStatus(titleId: string, formData: FormData) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const status = formData.get("status");
   if (!isStatus(status)) return;
   await ensureTitle(titleId);
@@ -67,7 +67,7 @@ export async function setStatus(titleId: string, formData: FormData) {
 }
 
 export async function setRating(titleId: string, formData: FormData) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const raw = String(formData.get("rating") ?? "");
   const rating = raw === "" ? null : Number(raw);
   if (rating !== null && !(Number.isInteger(rating) && rating >= 1 && rating <= 10)) return;
@@ -99,7 +99,7 @@ export async function setRating(titleId: string, formData: FormData) {
 }
 
 export async function removeEntry(titleId: string) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
   await supabase.from("watch_entries").delete().eq("user_id", me.id).eq("title_id", titleId);
   refresh();
@@ -110,7 +110,7 @@ export async function recommend(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const friendIds = formData.getAll("friend").map(String).filter(Boolean);
   const note = String(formData.get("note") ?? "").trim().slice(0, 280) || null;
   if (friendIds.length === 0) return { error: "Pick at least one friend." };
@@ -137,7 +137,7 @@ export async function recommend(
 }
 
 export async function dismissRecommendation(id: number) {
-  await getMe();
+  await getMyId();
   const supabase = await createClient();
   await supabase
     .from("recommendations")
@@ -150,7 +150,7 @@ export async function dismissRecommendation(id: number) {
 
 // One-tap "Add friend" from search results and profiles.
 export async function addFriend(username: string) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
   const { data: result } = await supabase.rpc("send_friend_request", { target_username: username });
   if (result === "sent" || result === "accepted") {
@@ -167,7 +167,7 @@ export async function addFriend(username: string) {
 }
 
 export async function acceptFriendRequest(requesterId: string) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
   const { error } = await supabase.rpc("accept_friend_request", { requester: requesterId });
   if (!error) after(() => notifyNowFriends(me.id, requesterId, "accepted"));
@@ -175,14 +175,14 @@ export async function acceptFriendRequest(requesterId: string) {
 }
 
 export async function deleteFriendRequest(fromId: string, toId: string) {
-  await getMe();
+  await getMyId();
   const supabase = await createClient();
   await supabase.from("friend_requests").delete().eq("from_id", fromId).eq("to_id", toId);
   refresh();
 }
 
 export async function removeFriend(friendId: string) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const [a, b] = [me.id, friendId].sort();
   const supabase = await createClient();
   await supabase.from("friendships").delete().eq("user_a", a).eq("user_b", b);
@@ -190,14 +190,14 @@ export async function removeFriend(friendId: string) {
 }
 
 export async function createInvite() {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
   await supabase.from("invites").insert({ created_by: me.id });
   refresh();
 }
 
 export async function acceptInvite(code: string) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("accept_invite", { invite_code: code });
   if (error) redirect(`/invite/${encodeURIComponent(code)}?error=1`);
@@ -211,7 +211,7 @@ export async function acceptInvite(code: string) {
 // --- Settings ----------------------------------------------------------------
 
 export async function updateProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const username = String(formData.get("username") ?? "").trim().toLowerCase();
   const displayName = String(formData.get("display_name") ?? "").trim();
   if (!/^[a-z0-9_]{3,20}$/.test(username)) {
@@ -237,7 +237,7 @@ export async function savePushSubscription(sub: {
   endpoint: string;
   keys: { p256dh: string; auth: string };
 }) {
-  await getMe();
+  await getMyId();
   const supabase = await createClient();
   const { error } = await supabase.rpc("save_push_subscription", {
     sub_endpoint: sub.endpoint,
@@ -248,7 +248,7 @@ export async function savePushSubscription(sub: {
 }
 
 export async function deletePushSubscription(endpoint: string) {
-  await getMe();
+  await getMyId();
   const supabase = await createClient();
   await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
 }
@@ -256,7 +256,7 @@ export async function deletePushSubscription(endpoint: string) {
 const KINDS: NotificationKind[] = ["friend_requests", "recommendations", "friend_activity", "friend_loved"];
 
 export async function setNotificationSetting(kind: NotificationKind, enabled: boolean) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   if (!KINDS.includes(kind)) return;
   const supabase = await createClient();
   await supabase
@@ -266,7 +266,7 @@ export async function setNotificationSetting(kind: NotificationKind, enabled: bo
 }
 
 export async function sendTestPush() {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   await notify([me.id], null, {
     title: "Notifications are on",
     body: "You'll hear about friend requests, recommendations and what your friends watch.",

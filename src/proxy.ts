@@ -25,9 +25,10 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Verifies the sign-in token locally and refreshes it when it's about to
+  // expire. Much faster than getUser(), which asks the Auth server every time.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ?? null;
 
   const { pathname, search } = request.nextUrl;
   const isPublic =

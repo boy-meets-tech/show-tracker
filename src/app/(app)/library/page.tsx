@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Empty, PageTitle, Skeleton } from "@/components/Section";
 import { Library } from "@/components/Library";
-import { getMe } from "@/lib/auth";
+import { getMyId } from "@/lib/auth";
 
 export const metadata = { title: "Library" };
 
@@ -18,7 +18,7 @@ export default function LibraryPage() {
 }
 
 async function MyLibrary() {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   return (
     <Library
       userId={me.id}

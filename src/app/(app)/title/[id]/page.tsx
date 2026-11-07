@@ -8,12 +8,13 @@ import { RatingPicker } from "@/components/RatingPicker";
 import { RecommendForm } from "@/components/RecommendForm";
 import { StatusPicker } from "@/components/StatusPicker";
 import { Card, Skeleton } from "@/components/Section";
-import { getMe } from "@/lib/auth";
+import { getMyId } from "@/lib/auth";
 import { listFriends } from "@/lib/friends";
 import { STATUS_LABEL, type WatchStatus } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
 import { getTitleDetails } from "@/lib/tmdb";
 import type { ProfileRow } from "@/lib/types";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export default function TitlePage({ params }: PageProps<"/title/[id]">) {
   return (
@@ -84,7 +85,7 @@ type FriendEntry = {
 };
 
 async function Social({ titleId }: { titleId: string }) {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
 
   const [{ data: entries }, { data: recs }, friends] = await Promise.all([
@@ -133,9 +134,7 @@ async function Social({ titleId }: { titleId: string }) {
           <RatingPicker titleId={titleId} rating={mine?.rating ?? null} />
           {mine ? (
             <form action={removeEntry.bind(null, titleId)}>
-              <button className="text-xs text-muted underline hover:text-foreground">
-                Remove from library
-              </button>
+              <SubmitButton className="inline-flex items-center gap-1.5 text-xs text-muted underline hover:text-foreground">Remove from library</SubmitButton>
             </form>
           ) : null}
         </div>

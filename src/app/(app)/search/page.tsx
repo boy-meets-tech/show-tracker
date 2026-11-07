@@ -3,9 +3,10 @@ import Form from "next/form";
 import { PageTitle, Empty, Skeleton } from "@/components/Section";
 import { TitleRow } from "@/components/TitleRow";
 import { STATUS_LABEL, type WatchStatus } from "@/lib/labels";
-import { getMe } from "@/lib/auth";
+import { getMyId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { searchTitles, trendingTitles, type TitleSummary } from "@/lib/tmdb";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const metadata = { title: "Search" };
 
@@ -34,7 +35,7 @@ function SearchBox({ q = "" }: { q?: string }) {
         autoFocus
         type="search"
       />
-      <button className="btn-primary shrink-0">Search</button>
+      <SubmitButton className="btn-primary shrink-0" pendingText="Searching…">Search</SubmitButton>
     </Form>
   );
 }
@@ -47,7 +48,7 @@ async function SearchBoxWithQuery({ searchParams }: Pick<PageProps<"/search">, "
 async function Results({ searchParams }: Pick<PageProps<"/search">, "searchParams">) {
   const raw = (await searchParams).q;
   const q = typeof raw === "string" ? raw.trim().slice(0, 100) : "";
-  const me = await getMe();
+  const me = { id: await getMyId() };
 
   let results: TitleSummary[];
   let fuzzy = false;

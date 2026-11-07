@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ActivityItem } from "@/components/ActivityItem";
 import { Card, Empty, PageTitle, Skeleton } from "@/components/Section";
-import { getMe } from "@/lib/auth";
+import { getMyId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityRow } from "@/lib/types";
 
@@ -21,7 +21,7 @@ const ACTIVITY_SELECT =
   "id, kind, status, rating, created_at, profiles(id, username, display_name, avatar_url), titles(id, name, media_type, poster_path, year)";
 
 async function Feed() {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
 
   const [{ data: activity }, { count: recCount }, { count: friendCount }] = await Promise.all([

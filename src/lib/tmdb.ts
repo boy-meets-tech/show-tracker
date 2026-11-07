@@ -121,7 +121,7 @@ async function popularPool(): Promise<Candidate[]> {
   ];
   const pages = await Promise.all(
     lists.flatMap(([path, type]) =>
-      ["1", "2", "3"].map(async (page) => {
+      ["1", "2"].map(async (page) => {
         try {
           const data = await tmdb<{ results: RawResult[] }>(path, { page });
           return candidates(data.results.map((r) => ({ ...r, media_type: r.media_type ?? type ?? undefined })));

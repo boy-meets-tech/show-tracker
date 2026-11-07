@@ -4,9 +4,10 @@ import { PasskeyButton } from "@/components/PasskeyButton";
 import { ProfileForm } from "@/components/ProfileForm";
 import { PushSettings } from "@/components/PushSettings";
 import { Card, PageTitle, Skeleton } from "@/components/Section";
-import { getMe } from "@/lib/auth";
+import { getMe, getMyId } from "@/lib/auth";
 import { vapidPublicKey } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const metadata = { title: "Settings" };
 
@@ -22,13 +23,14 @@ export default function SettingsPage() {
 }
 
 async function Settings() {
-  const me = await getMe();
+  const myId = await getMyId();
   const supabase = await createClient();
-  const [{ data: prefs }, publicKey] = await Promise.all([
+  const [me, { data: prefs }, publicKey] = await Promise.all([
+    getMe(),
     supabase
       .from("notification_settings")
       .select("friend_requests, recommendations, friend_activity, friend_loved")
-      .eq("user_id", me.id)
+      .eq("user_id", myId)
       .maybeSingle(),
     vapidPublicKey(),
   ]);
@@ -58,7 +60,7 @@ async function Settings() {
         <PasskeyButton />
       </Card>
       <form action={signOut}>
-        <button className="btn-secondary">Sign out</button>
+        <SubmitButton className="btn-secondary" pendingText="Signing out…">Sign out</SubmitButton>
       </form>
     </>
   );

@@ -1,4 +1,5 @@
 import { acceptFriendRequest, addFriend, deleteFriendRequest } from "@/app/actions";
+import { SubmitButton } from "./SubmitButton";
 
 export type Relation = "friend" | "sent" | "received" | "none";
 
@@ -18,22 +19,22 @@ export function PersonAction({
   if (relation === "received") {
     return (
       <form action={acceptFriendRequest.bind(null, person.id)}>
-        <button className="btn-primary py-1.5">Accept</button>
+        <SubmitButton className="btn-primary py-1.5">Accept</SubmitButton>
       </form>
     );
   }
   if (relation === "sent") {
     return (
       <form action={deleteFriendRequest.bind(null, meId, person.id)}>
-        <button className="btn-secondary py-1.5" title="Cancel request">
+        <SubmitButton className="btn-secondary py-1.5" title="Cancel request">
           Requested
-        </button>
+        </SubmitButton>
       </form>
     );
   }
   return (
     <form action={addFriend.bind(null, person.username)}>
-      <button className="btn-primary py-1.5">Add friend</button>
+      <SubmitButton className="btn-primary py-1.5" pendingText="Adding…">Add friend</SubmitButton>
     </form>
   );
 }

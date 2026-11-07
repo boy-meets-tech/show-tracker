@@ -5,7 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { PersonAction, type Relation } from "@/components/PersonAction";
 import { Library } from "@/components/Library";
 import { Card, Empty, Skeleton } from "@/components/Section";
-import { getMe } from "@/lib/auth";
+import { getMyId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityRow, ProfileRow } from "@/lib/types";
 
@@ -19,7 +19,7 @@ export default function ProfilePage({ params }: PageProps<"/u/[username]">) {
 
 async function Profile({ params }: Pick<PageProps<"/u/[username]">, "params">) {
   const { username } = await params;
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")

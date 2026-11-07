@@ -11,10 +11,11 @@ import { Avatar } from "@/components/Avatar";
 import { CopyInvite } from "@/components/CopyInvite";
 import { PersonAction, type Relation } from "@/components/PersonAction";
 import { Card, Empty, PageTitle, Skeleton } from "@/components/Section";
-import { getMe } from "@/lib/auth";
+import { getMe, getMyId } from "@/lib/auth";
 import { listFriends } from "@/lib/friends";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow } from "@/lib/types";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const metadata = { title: "Friends" };
 
@@ -41,17 +42,18 @@ type RequestRow = {
 async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchParams">) {
   const raw = (await searchParams).q;
   const q = typeof raw === "string" ? raw.trim().slice(0, 50) : "";
-  const me = await getMe();
+  const myId = await getMyId();
   const supabase = await createClient();
-  const [friends, { data: requestData }, { data: invite }, { data: found }] = await Promise.all([
-    listFriends(me.id),
+  const [me, friends, { data: requestData }, { data: invite }, { data: found }] = await Promise.all([
+    getMe(),
+    listFriends(myId),
     supabase
       .from("friend_requests")
       .select(
         "from_id, to_id, from:profiles!friend_requests_from_id_fkey(id, username, display_name, avatar_url), to:profiles!friend_requests_to_id_fkey(id, username, display_name, avatar_url)"
       )
       .order("created_at", { ascending: false }),
-    currentInvite(me.id),
+    currentInvite(myId),
     q.length >= 2 ? supabase.rpc("search_people", { query: q }) : Promise.resolve({ data: null }),
   ]);
   const people = (found ?? []) as PersonResult[];
@@ -69,7 +71,7 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
           <CopyInvite code={invite.code} expiresAt={invite.expires_at} />
         ) : (
           <form action={createInvite}>
-            <button className="btn-primary">Create invite link</button>
+            <SubmitButton pendingText="Creating…">Create invite link</SubmitButton>
           </form>
         )}
       </Card>
@@ -85,7 +87,7 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
             autoCapitalize="none"
             autoCorrect="off"
           />
-          <button className="btn-secondary shrink-0">Search</button>
+          <SubmitButton className="btn-secondary shrink-0" pendingText="Searching…">Search</SubmitButton>
         </Form>
         <p className="mt-2 text-xs text-muted">
           Close spellings work too. Your username is{" "}
@@ -118,10 +120,10 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
               <li key={r.from_id} className="flex items-center gap-3">
                 <PersonLabel person={r.from} />
                 <form action={acceptFriendRequest.bind(null, r.from_id)} className="ml-auto">
-                  <button className="btn-primary py-1.5">Accept</button>
+                  <SubmitButton className="btn-primary py-1.5">Accept</SubmitButton>
                 </form>
                 <form action={deleteFriendRequest.bind(null, r.from_id, me.id)}>
-                  <button className="btn-secondary py-1.5">Decline</button>
+                  <SubmitButton className="btn-secondary py-1.5">Decline</SubmitButton>
                 </form>
               </li>
             ))}
@@ -140,7 +142,7 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
                   <PersonLabel person={f} />
                 </Link>
                 <form action={removeFriend.bind(null, f.id)} className="ml-auto">
-                  <button className="text-xs text-muted underline hover:text-foreground">Remove</button>
+                  <SubmitButton className="inline-flex items-center gap-1.5 text-xs text-muted underline hover:text-foreground">Remove</SubmitButton>
                 </form>
               </li>
             ))}
@@ -155,7 +157,7 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
               <li key={r.to_id} className="flex items-center gap-3">
                 <PersonLabel person={r.to} />
                 <form action={deleteFriendRequest.bind(null, me.id, r.to_id)} className="ml-auto">
-                  <button className="text-xs text-muted underline hover:text-foreground">Cancel</button>
+                  <SubmitButton className="inline-flex items-center gap-1.5 text-xs text-muted underline hover:text-foreground">Cancel</SubmitButton>
                 </form>
               </li>
             ))}

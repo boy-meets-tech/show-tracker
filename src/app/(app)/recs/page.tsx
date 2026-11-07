@@ -4,10 +4,11 @@ import { dismissRecommendation } from "@/app/actions";
 import { Avatar } from "@/components/Avatar";
 import { Card, Empty, PageTitle, Skeleton } from "@/components/Section";
 import { TitleRow } from "@/components/TitleRow";
-import { getMe } from "@/lib/auth";
+import { getMyId } from "@/lib/auth";
 import { timeAgo } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, TitleRowData } from "@/lib/types";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const metadata = { title: "For you" };
 
@@ -44,7 +45,7 @@ type Pick = {
 };
 
 async function Recs() {
-  const me = await getMe();
+  const me = { id: await getMyId() };
   const supabase = await createClient();
   const [{ data: recData }, { data: pickData }] = await Promise.all([
     supabase
@@ -87,9 +88,7 @@ async function Recs() {
                   </TitleRow>
                 </div>
                 <form action={dismissRecommendation.bind(null, r.id)}>
-                  <button className="mt-2 text-xs text-muted underline hover:text-foreground">
-                    Dismiss
-                  </button>
+                  <SubmitButton className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted underline hover:text-foreground">Dismiss</SubmitButton>
                 </form>
               </li>
             ))}
