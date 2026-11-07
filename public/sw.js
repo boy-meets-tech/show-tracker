@@ -4,6 +4,15 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
+// Tell the server what happened, so problems on phones show up in its logs.
+function report(stage, tag, error) {
+  return fetch("/api/push-log", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ stage, tag, error: error ? String(error) : undefined }),
+  }).catch(() => {});
+}
+
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -12,16 +21,19 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
   // iPhones require every push to show a notification, so always show one.
-  event.waitUntil(
-    self.registration.showNotification(data.title || "Show Tracker", {
+  // Only use options every browser supports.
+  const show = self.registration
+    .showNotification(data.title || "Show Tracker", {
       body: data.body || "",
       icon: "/icon-192.png",
-      badge: "/icon-192.png",
       tag: data.tag,
-      renotify: Boolean(data.tag),
       data: { url: data.url || "/" },
     })
-  );
+    .then(
+      () => report("shown", data.tag),
+      (err) => report("show-failed", data.tag, err)
+    );
+  event.waitUntil(Promise.all([report("received", data.tag), show]));
 });
 
 self.addEventListener("notificationclick", (event) => {
