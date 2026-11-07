@@ -34,7 +34,9 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
     // Phones fetch the app manifest without the sign-in cookie.
-    pathname === "/manifest.webmanifest";
+    pathname === "/manifest.webmanifest" ||
+    // The notification service worker is fetched without the sign-in cookie.
+    pathname === "/sw.js";
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

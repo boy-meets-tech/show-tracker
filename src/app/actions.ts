@@ -2,8 +2,17 @@
 
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getMe } from "@/lib/auth";
 import { isStatus } from "@/lib/labels";
+import {
+  notify,
+  notifyActivity,
+  notifyFriendRequest,
+  notifyNowFriends,
+  notifyRecommendation,
+  type NotificationKind,
+} from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 import { getTitleDetails, parseTitleId } from "@/lib/tmdb";
 
@@ -41,9 +50,19 @@ export async function setStatus(titleId: string, formData: FormData) {
   await ensureTitle(titleId);
 
   const supabase = await createClient();
-  await supabase
+  const { data: before } = await supabase
+    .from("watch_entries")
+    .select("status")
+    .eq("user_id", me.id)
+    .eq("title_id", titleId)
+    .maybeSingle();
+  const { error } = await supabase
     .from("watch_entries")
     .upsert({ user_id: me.id, title_id: titleId, status }, { onConflict: "user_id,title_id" });
+  if (!error && before?.status !== status) {
+    // Sends after the response, so the button doesn't wait on it.
+    after(() => notifyActivity(me.id, titleId, { status }));
+  }
   refresh();
 }
 
@@ -57,7 +76,7 @@ export async function setRating(titleId: string, formData: FormData) {
   // Rating something you haven't logged marks it finished.
   const { data: entry } = await supabase
     .from("watch_entries")
-    .select("status")
+    .select("status, rating")
     .eq("user_id", me.id)
     .eq("title_id", titleId)
     .maybeSingle();
@@ -72,6 +91,9 @@ export async function setRating(titleId: string, formData: FormData) {
     await supabase
       .from("watch_entries")
       .insert({ user_id: me.id, title_id: titleId, status: "finished", rating });
+  }
+  if (rating !== null && entry?.rating !== rating) {
+    after(() => notifyActivity(me.id, titleId, { rating }));
   }
   refresh();
 }
@@ -99,11 +121,17 @@ export async function recommend(
     return { error: (e as Error).message };
   }
   const supabase = await createClient();
-  const { error } = await supabase.from("recommendations").upsert(
-    friendIds.map((to_id) => ({ from_id: me.id, to_id, title_id: titleId, note })),
-    { onConflict: "from_id,to_id,title_id", ignoreDuplicates: true }
-  );
+  const { data: sent, error } = await supabase
+    .from("recommendations")
+    .upsert(
+      friendIds.map((to_id) => ({ from_id: me.id, to_id, title_id: titleId, note })),
+      { onConflict: "from_id,to_id,title_id", ignoreDuplicates: true }
+    )
+    .select("to_id");
   if (error) return { error: "Couldn't send that. Are you still friends?" };
+  // Only notify people this is new for (repeats are ignored above).
+  const newlySent = (sent ?? []).map((r: { to_id: string }) => r.to_id);
+  if (newlySent.length) after(() => notifyRecommendation(me.id, newlySent, titleId, note));
   refresh();
   return { ok: friendIds.length === 1 ? "Sent!" : `Sent to ${friendIds.length} friends!` };
 }
@@ -122,16 +150,27 @@ export async function dismissRecommendation(id: number) {
 
 // One-tap "Add friend" from search results and profiles.
 export async function addFriend(username: string) {
-  await getMe();
+  const me = await getMe();
   const supabase = await createClient();
-  await supabase.rpc("send_friend_request", { target_username: username });
+  const { data: result } = await supabase.rpc("send_friend_request", { target_username: username });
+  if (result === "sent" || result === "accepted") {
+    const { data: target } = await supabase.from("profiles").select("id").eq("username", username).single();
+    if (target) {
+      after(() =>
+        result === "sent"
+          ? notifyFriendRequest(me.id, target.id)
+          : notifyNowFriends(me.id, target.id, "accepted")
+      );
+    }
+  }
   refresh();
 }
 
 export async function acceptFriendRequest(requesterId: string) {
-  await getMe();
+  const me = await getMe();
   const supabase = await createClient();
-  await supabase.rpc("accept_friend_request", { requester: requesterId });
+  const { error } = await supabase.rpc("accept_friend_request", { requester: requesterId });
+  if (!error) after(() => notifyNowFriends(me.id, requesterId, "accepted"));
   refresh();
 }
 
@@ -158,10 +197,14 @@ export async function createInvite() {
 }
 
 export async function acceptInvite(code: string) {
-  await getMe();
+  const me = await getMe();
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("accept_invite", { invite_code: code });
   if (error) redirect(`/invite/${encodeURIComponent(code)}?error=1`);
+  const { data: inviter } = await supabase.from("profiles").select("id").eq("username", data).single();
+  if (inviter && inviter.id !== me.id) {
+    after(() => notifyNowFriends(me.id, inviter.id, "invite"));
+  }
   redirect(`/u/${data}`);
 }
 
@@ -186,6 +229,50 @@ export async function updateProfile(_prev: ActionState, formData: FormData): Pro
   }
   refresh();
   return { ok: "Saved." };
+}
+
+// --- Notifications -----------------------------------------------------------
+
+export async function savePushSubscription(sub: {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}) {
+  await getMe();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("save_push_subscription", {
+    sub_endpoint: sub.endpoint,
+    sub_p256dh: sub.keys.p256dh,
+    sub_auth: sub.keys.auth,
+  });
+  if (error) throw new Error("Couldn't turn on notifications for this device.");
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  await getMe();
+  const supabase = await createClient();
+  await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+}
+
+const KINDS: NotificationKind[] = ["friend_requests", "recommendations", "friend_activity", "friend_loved"];
+
+export async function setNotificationSetting(kind: NotificationKind, enabled: boolean) {
+  const me = await getMe();
+  if (!KINDS.includes(kind)) return;
+  const supabase = await createClient();
+  await supabase
+    .from("notification_settings")
+    .upsert({ user_id: me.id, [kind]: enabled, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  refresh();
+}
+
+export async function sendTestPush() {
+  const me = await getMe();
+  await notify([me.id], null, {
+    title: "Notifications are on",
+    body: "You'll hear about friend requests, recommendations and what your friends watch.",
+    url: "/settings",
+    tag: "test",
+  });
 }
 
 export async function signOut() {
