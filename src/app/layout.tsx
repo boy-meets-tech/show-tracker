@@ -10,6 +10,9 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: { default: "Show Tracker", template: "%s · Show Tracker" },
   description: "Keep track of the shows and movies you and your friends are watching.",
+  applicationName: "Show Tracker",
+  // Opening from the iPhone Home Screen shows the app full screen, without Safari's bars.
+  appleWebApp: { capable: true, title: "Show Tracker", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

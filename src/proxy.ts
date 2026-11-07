@@ -30,7 +30,11 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname, search } = request.nextUrl;
-  const isPublic = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  const isPublic =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth") ||
+    // Phones fetch the app manifest without the sign-in cookie.
+    pathname === "/manifest.webmanifest";
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
