@@ -56,3 +56,13 @@ body {
 @utility input {
   @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent;
 }
+
+/* iPhone Safari zooms into any text box under 16px when you tap it. Keep
+   form text at 16px on phone-sized screens so it doesn't. */
+@media (max-width: 639px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
