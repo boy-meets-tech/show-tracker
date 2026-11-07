@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useSyncExternalStore } from "react";
 
 const LINKS = [
   { href: "/", label: "Feed", icon: "M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" },
@@ -11,6 +11,34 @@ const LINKS = [
   { href: "/recs", label: "For you", icon: "M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" },
   { href: "/friends", label: "Friends", icon: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm7 0a3 3 0 1 0 0-6M2 21c0-4 3-6 7-6s7 2 7 6M17 15c3 0 5 2 5 5" },
 ];
+
+// True while the on-screen keyboard is up: a text box has focus and the
+// visible area has shrunk. iPhone Safari otherwise floats the fixed tab bar
+// up into the middle of the page while typing and scrolling.
+function subscribeKeyboard(onChange: () => void) {
+  const vv = window.visualViewport;
+  vv?.addEventListener("resize", onChange);
+  window.addEventListener("focusin", onChange);
+  window.addEventListener("focusout", onChange);
+  return () => {
+    vv?.removeEventListener("resize", onChange);
+    window.removeEventListener("focusin", onChange);
+    window.removeEventListener("focusout", onChange);
+  };
+}
+
+function keyboardOpen() {
+  const el = document.activeElement;
+  const typing =
+    el instanceof HTMLTextAreaElement ||
+    (el instanceof HTMLInputElement && !["button", "checkbox", "radio", "submit"].includes(el.type));
+  const vv = window.visualViewport;
+  return typing && !!vv && vv.height < window.innerHeight - 120;
+}
+
+function useKeyboardOpen() {
+  return useSyncExternalStore(subscribeKeyboard, keyboardOpen, () => false);
+}
 
 export function Nav() {
   // The current path is only known at request time, so the highlighted tab
@@ -27,6 +55,7 @@ function NavWithPath() {
 }
 
 function NavView({ pathname }: { pathname: string | null }) {
+  const hideTabs = useKeyboardOpen();
   const isActive = (href: string) =>
     pathname !== null && (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
@@ -58,7 +87,7 @@ function NavView({ pathname }: { pathname: string | null }) {
           </Link>
         </div>
       </header>
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-background/95 px-[env(safe-area-inset-left)] pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
+      <nav className={`fixed inset-x-0 bottom-0 z-20 border-t ${hideTabs ? "hidden" : "flex"} border-border bg-background/95 px-[env(safe-area-inset-left)] pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden`}>
         {LINKS.map((l) => (
           <Link
             key={l.href}
