@@ -3,7 +3,9 @@ import Link from "next/link";
 import { dismissRecommendation } from "@/app/actions";
 import { Avatar } from "@/components/Avatar";
 import { Card, Empty, PageTitle, Skeleton } from "@/components/Section";
+import { ServiceBadge } from "@/components/ServiceBadge";
 import { TitleRow } from "@/components/TitleRow";
+import { onMyServices } from "@/lib/watch";
 import { getMyId } from "@/lib/auth";
 import { timeAgo } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
@@ -60,6 +62,7 @@ async function Recs() {
   ]);
   const recs = (recData ?? []) as unknown as Rec[];
   const picks = (pickData ?? []) as Pick[];
+  const available = await onMyServices([...recs.map((r) => r.titles.id), ...picks.map((p) => p.title_id)]);
 
   return (
     <>
@@ -85,6 +88,7 @@ async function Recs() {
                       </span>
                     </div>
                     {r.note ? <p className="ph-mask mt-1 text-sm italic">“{r.note}”</p> : null}
+                    <ServiceBadge names={available[r.titles.id]} />
                   </TitleRow>
                 </div>
                 <form action={dismissRecommendation.bind(null, r.id)}>
@@ -120,6 +124,7 @@ async function Recs() {
                     from <span className="ph-mask">{formatNames(p.friend_names)}</span>
                   </span>
                 </p>
+                <ServiceBadge names={available[p.title_id]} />
               </TitleRow>
             ))}
           </div>

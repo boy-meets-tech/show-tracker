@@ -9,6 +9,7 @@ export type Profile = {
   display_name: string;
   avatar_url: string | null;
   country: string | null; // chosen "Where to watch" country, or null for automatic
+  services: number[]; // streaming services they subscribe to (TMDB provider ids)
 };
 
 // The signed-in user's id. Checks the sign-in token locally (no call to the
@@ -33,7 +34,7 @@ export const getMe = cache(async (): Promise<Profile> => {
   const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, country")
+    .select("id, username, display_name, avatar_url, country, services")
     .eq("id", id)
     .single();
   if (!profile) redirect("/login");

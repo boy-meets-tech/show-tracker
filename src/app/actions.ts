@@ -287,6 +287,15 @@ export async function setWatchCountry(country: string | null) {
   refresh();
 }
 
+// The streaming services you subscribe to (TMDB provider ids).
+export async function setMyServices(ids: number[]) {
+  const me = { id: await getMyId() };
+  const services = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 60);
+  const supabase = await createClient();
+  await supabase.from("profiles").update({ services }).eq("id", me.id);
+  refresh();
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

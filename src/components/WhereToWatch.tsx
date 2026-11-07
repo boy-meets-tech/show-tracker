@@ -1,18 +1,27 @@
 import Link from "next/link";
-import { getMe } from "@/lib/auth";
-import { countryName, detectedCountry } from "@/lib/country";
+import { countryName } from "@/lib/country";
 import { getWatchOptions, type Provider, type WatchOptions } from "@/lib/tmdb";
+import { myWatchSetup } from "@/lib/watch";
 import { Card } from "./Section";
 
 // Streaming, free and rent/buy options for a title in the viewer's country.
 export async function WhereToWatch({ titleId }: { titleId: string }) {
-  const me = await getMe();
-  const country = me.country ?? (await detectedCountry());
+  const { country, services } = await myWatchSetup();
   const options = await getWatchOptions(titleId, country);
-  return <WatchOptionsView options={options} place={countryName(country)} />;
+  return <WatchOptionsView options={options} place={countryName(country)} mine={services} />;
 }
 
-export function WatchOptionsView({ options, place }: { options: WatchOptions | null; place: string }) {
+export function WatchOptionsView({
+  options,
+  place,
+  mine = [],
+}: {
+  options: WatchOptions | null;
+  place: string;
+  mine?: number[];
+}) {
+  const yours = new Set(mine);
+  const included = options ? [...options.stream, ...options.free].filter((p) => yours.has(p.id)) : [];
   const groups: [string, Provider[]][] = options
     ? [
         ["Stream", options.stream],
@@ -39,6 +48,18 @@ export function WatchOptionsView({ options, place }: { options: WatchOptions | n
         <p className="text-sm text-muted">Not available to stream, rent or buy in {place} right now.</p>
       ) : (
         <div className="space-y-4">
+          {included.length ? (
+            <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm font-medium text-accent">
+              ✓ Included with your {included.map((p) => p.name).join(", ")}
+            </p>
+          ) : mine.length === 0 ? (
+            <p className="text-xs text-muted">
+              <Link href="/settings#services" className="underline">
+                Pick your services
+              </Link>{" "}
+              to see at a glance what you can watch.
+            </p>
+          ) : null}
           {groups.map(([label, list]) =>
             list.length ? (
               <div key={label}>
@@ -58,7 +79,7 @@ export function WatchOptionsView({ options, place }: { options: WatchOptions | n
                             src={`https://image.tmdb.org/t/p/w92${p.logoPath}`}
                             alt=""
                             loading="lazy"
-                            className="h-12 w-12 rounded-xl ring-1 ring-border"
+                            className={`h-12 w-12 rounded-xl ${yours.has(p.id) ? "ring-2 ring-accent" : "ring-1 ring-border"}`}
                           />
                         ) : (
                           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-2 text-xs">
@@ -66,6 +87,9 @@ export function WatchOptionsView({ options, place }: { options: WatchOptions | n
                           </span>
                         )}
                         <span className="line-clamp-2 text-[11px] leading-tight">{p.name}</span>
+                        {yours.has(p.id) && label !== "Rent or buy" ? (
+                          <span className="text-[10px] font-semibold text-accent">Yours</span>
+                        ) : null}
                       </a>
                     </li>
                   ))}

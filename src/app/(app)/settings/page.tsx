@@ -2,13 +2,14 @@ import { Suspense } from "react";
 import { signOut } from "@/app/actions";
 import { CountryPicker } from "@/components/CountryPicker";
 import { PasskeyButton } from "@/components/PasskeyButton";
+import { ServicesPicker } from "@/components/ServicesPicker";
 import { ProfileForm } from "@/components/ProfileForm";
 import { PushSettings } from "@/components/PushSettings";
 import { Card, PageTitle, Skeleton } from "@/components/Section";
 import { getMe, getMyId } from "@/lib/auth";
 import { countryName, detectedCountry } from "@/lib/country";
 import { vapidPublicKey } from "@/lib/push";
-import { watchCountries } from "@/lib/tmdb";
+import { streamingServices, watchCountries } from "@/lib/tmdb";
 import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/SubmitButton";
 
@@ -52,6 +53,9 @@ async function Settings() {
           countries={countries}
         />
       </Card>
+      <Suspense fallback={<Skeleton rows={2} />}>
+        <MyServices country={me.country ?? detected} selected={me.services} />
+      </Suspense>
       <Card title="Notifications">
         <PushSettings
           publicKey={publicKey}
@@ -76,5 +80,16 @@ async function Settings() {
         <SubmitButton className="btn-secondary" pendingText="Signing out…">Sign out</SubmitButton>
       </form>
     </>
+  );
+}
+
+async function MyServices({ country, selected }: { country: string; selected: number[] }) {
+  const services = await streamingServices(country);
+  return (
+    <section id="services">
+      <Card title="My services">
+        <ServicesPicker services={services} selected={selected} />
+      </Card>
+    </section>
   );
 }

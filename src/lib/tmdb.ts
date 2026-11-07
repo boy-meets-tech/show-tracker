@@ -284,3 +284,51 @@ export async function watchCountries(): Promise<{ code: string; name: string }[]
     return [];
   }
 }
+
+// Subscription services available in a country (for the "My services" picker),
+// most popular first.
+export async function streamingServices(country: string): Promise<Provider[]> {
+  "use cache";
+  cacheLife("days");
+  type Raw = RawProvider & { display_priorities?: Record<string, number> };
+  try {
+    const [tv, movie] = await Promise.all(
+      ["tv", "movie"].map((kind) =>
+        tmdb<{ results: Raw[] }>(`/watch/providers/${kind}`, { watch_region: country })
+      )
+    );
+    const byId = new Map<number, Raw>();
+    for (const p of [...tv.results, ...movie.results]) if (!byId.has(p.provider_id)) byId.set(p.provider_id, p);
+    return [...byId.values()]
+      .sort(
+        (a, b) =>
+          (a.display_priorities?.[country] ?? a.display_priority ?? 999) -
+          (b.display_priorities?.[country] ?? b.display_priority ?? 999)
+      )
+      .slice(0, 60)
+      .map((p) => ({ id: p.provider_id, name: p.provider_name, logoPath: p.logo_path }));
+  } catch {
+    return [];
+  }
+}
+
+// For each title, which of these services include it with a subscription
+// (or for free) in this country. Looks titles up in parallel; each lookup is
+// cached for a few hours.
+export async function availableOn(
+  titleIds: string[],
+  country: string,
+  serviceIds: number[]
+): Promise<Record<string, string[]>> {
+  if (serviceIds.length === 0 || titleIds.length === 0) return {};
+  const mine = new Set(serviceIds);
+  const unique = [...new Set(titleIds)].slice(0, 80);
+  const pairs = await Promise.all(
+    unique.map(async (id) => {
+      const options = await getWatchOptions(id, country);
+      const names = options ? [...options.stream, ...options.free].filter((p) => mine.has(p.id)).map((p) => p.name) : [];
+      return [id, names] as const;
+    })
+  );
+  return Object.fromEntries(pairs.filter(([, names]) => names.length > 0));
+}

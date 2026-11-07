@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { STATUSES, STATUS_LABEL, type WatchStatus } from "@/lib/labels";
 import type { EntryRow } from "@/lib/types";
+import { ServiceBadge } from "./ServiceBadge";
 import { TitleRow } from "./TitleRow";
 
 const EMPTY_TEXT: Record<WatchStatus, string> = {
@@ -13,7 +14,15 @@ const EMPTY_TEXT: Record<WatchStatus, string> = {
 };
 
 // Tabs across the top, one per status; tapping one shows just those titles.
-export function LibraryTabs({ entries }: { entries: EntryRow[] }) {
+export function LibraryTabs({
+  entries,
+  available = {},
+  hasServices = false,
+}: {
+  entries: EntryRow[];
+  available?: Record<string, string[]>;
+  hasServices?: boolean;
+}) {
   const counts = Object.fromEntries(
     STATUSES.map((s) => [s, entries.filter((e) => e.status === s).length])
   ) as Record<WatchStatus, number>;
@@ -21,7 +30,10 @@ export function LibraryTabs({ entries }: { entries: EntryRow[] }) {
   const [active, setActive] = useState<WatchStatus>(
     () => STATUSES.find((s) => counts[s] > 0) ?? "watching"
   );
-  const shown = entries.filter((e) => e.status === active);
+  const [onlyMine, setOnlyMine] = useState(false);
+  const canFilter = hasServices && (active === "want" || active === "watching");
+  const inTab = entries.filter((e) => e.status === active);
+  const shown = canFilter && onlyMine ? inTab.filter((e) => available[e.title_id]) : inTab;
 
   return (
     <div>
@@ -59,9 +71,23 @@ export function LibraryTabs({ entries }: { entries: EntryRow[] }) {
         })}
       </div>
 
+      {canFilter ? (
+        <label className="mb-3 flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={onlyMine}
+            onChange={(e) => setOnlyMine(e.target.checked)}
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+          Only what I can watch on my services
+        </label>
+      ) : null}
+
       <div id="library-panel" role="tabpanel" aria-labelledby={`tab-${active}`}>
         {shown.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted">{EMPTY_TEXT[active]}</p>
+          <p className="py-10 text-center text-sm text-muted">
+            {canFilter && onlyMine && inTab.length ? "None of these are on your services right now." : EMPTY_TEXT[active]}
+          </p>
         ) : (
           <div className="grid gap-1 sm:grid-cols-2">
             {shown.map((e) => (
@@ -78,6 +104,9 @@ export function LibraryTabs({ entries }: { entries: EntryRow[] }) {
                     {e.rating}/10
                   </span>
                 ) : null}
+                <div>
+                  <ServiceBadge names={available[e.title_id]} />
+                </div>
               </TitleRow>
             ))}
           </div>
