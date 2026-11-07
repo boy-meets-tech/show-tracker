@@ -1,4 +1,5 @@
 import { cacheLife } from "next/cache";
+import { queryVariants, rankByQuery, similarity } from "./fuzzy";
 
 // Thin client for The Movie Database (TMDB) API.
 // TMDB_API_KEY may be either a v3 API key or a v4 "API Read Access Token".
@@ -64,6 +65,7 @@ type RawResult = {
   first_air_date?: string;
   release_date?: string;
   overview?: string;
+  popularity?: number;
 };
 
 function yearOf(date?: string) {
@@ -89,14 +91,89 @@ function onlyShowsAndMovies(results: RawResult[]) {
     .map((r) => toSummary(r, r.media_type as MediaType));
 }
 
-export async function searchTitles(query: string): Promise<TitleSummary[]> {
+type Candidate = TitleSummary & { popularity?: number };
+
+function candidates(results: RawResult[]): Candidate[] {
+  return results
+    .filter((r) => r.media_type === "tv" || r.media_type === "movie")
+    .map((r) => ({ ...toSummary(r, r.media_type as MediaType), popularity: r.popularity }));
+}
+
+async function searchRaw(query: string): Promise<Candidate[]> {
   "use cache";
   cacheLife("hours");
   const data = await tmdb<{ results: RawResult[] }>("/search/multi", {
     query,
     include_adult: "false",
   });
-  return onlyShowsAndMovies(data.results);
+  return candidates(data.results);
+}
+
+// A few hundred well-known titles, used to catch typos TMDB's own search
+// can't (a misspelling near the start of a word, like "inseption").
+async function popularPool(): Promise<Candidate[]> {
+  "use cache";
+  cacheLife("hours");
+  const lists: [string, MediaType | null][] = [
+    ["/trending/all/week", null],
+    ["/tv/popular", "tv"],
+    ["/movie/popular", "movie"],
+    ["/tv/top_rated", "tv"],
+    ["/movie/top_rated", "movie"],
+  ];
+  const pages = await Promise.all(
+    lists.flatMap(([path, type]) =>
+      ["1", "2", "3"].map(async (page) => {
+        try {
+          const data = await tmdb<{ results: RawResult[] }>(path, { page });
+          return candidates(data.results.map((r) => ({ ...r, media_type: r.media_type ?? type ?? undefined })));
+        } catch {
+          return [];
+        }
+      })
+    )
+  );
+  return pages.flat();
+}
+
+export type SearchResult = {
+  results: TitleSummary[];
+  // True when nothing matched as typed and these are the closest guesses.
+  fuzzy: boolean;
+};
+
+const strip = (c: Candidate): TitleSummary => ({
+  id: c.id,
+  mediaType: c.mediaType,
+  tmdbId: c.tmdbId,
+  name: c.name,
+  posterPath: c.posterPath,
+  year: c.year,
+  overview: c.overview,
+});
+
+export async function searchTitles(query: string): Promise<SearchResult> {
+  const exact = await searchRaw(query);
+  const good = exact.filter((r) => similarity(query, r.name) >= 0.75);
+  if (good.length > 0) return { results: exact.map(strip), fuzzy: false };
+
+  // Nothing close: search looser versions too and rank everything together.
+  const [variantResults, pool] = await Promise.all([
+    Promise.all(queryVariants(query).map((v) => searchRaw(v).catch(() => []))),
+    popularPool(),
+  ]);
+  const byId = new Map<string, Candidate>();
+  for (const r of [...exact, ...variantResults.flat(), ...pool]) {
+    if (!byId.has(r.id)) byId.set(r.id, r);
+  }
+  const ranked = rankByQuery(query, [...byId.values()]).slice(0, 20);
+  if (ranked.length === 0) return { results: exact.map(strip), fuzzy: false };
+  // Keep TMDB's own matches for the query underneath the close guesses.
+  const rankedIds = new Set(ranked.map((r) => r.id));
+  return {
+    results: [...ranked, ...exact.filter((r) => !rankedIds.has(r.id))].map(strip),
+    fuzzy: true,
+  };
 }
 
 export async function trendingTitles(): Promise<TitleSummary[]> {

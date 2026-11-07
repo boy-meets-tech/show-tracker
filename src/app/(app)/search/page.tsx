@@ -50,8 +50,13 @@ async function Results({ searchParams }: Pick<PageProps<"/search">, "searchParam
   const me = await getMe();
 
   let results: TitleSummary[];
+  let fuzzy = false;
   try {
-    results = q ? await searchTitles(q) : await trendingTitles();
+    if (q) {
+      ({ results, fuzzy } = await searchTitles(q));
+    } else {
+      results = await trendingTitles();
+    }
   } catch {
     return <Empty>Search isn&apos;t available right now. Check that TMDB_API_KEY is set.</Empty>;
   }
@@ -72,7 +77,11 @@ async function Results({ searchParams }: Pick<PageProps<"/search">, "searchParam
   return (
     <>
       <h2 className="mb-2 text-sm font-medium text-muted">
-        {q ? `Results for “${q}”` : "Trending this week"}
+        {!q
+          ? "Trending this week"
+          : fuzzy
+            ? `No exact matches for “${q}”. Did you mean one of these?`
+            : `Results for “${q}”`}
       </h2>
       {results.length === 0 ? (
         <Empty>No shows or movies found.</Empty>
