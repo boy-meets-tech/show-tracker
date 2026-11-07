@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import posthog from "posthog-js";
 import {
   deletePushSubscription,
   savePushSubscription,
@@ -118,6 +119,9 @@ export function PushSettings({
             applicationServerKey: base64UrlToBytes(publicKey),
           }));
         await savePushSubscription(sub.toJSON() as Parameters<typeof savePushSubscription>[0]);
+        if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+          posthog.capture("push_notifications_enabled");
+        }
         setSubscribed(true);
         setMessage(
           `Done! Leave the app or lock your phone now: a test notification arrives in ${TEST_DELAY} seconds.`
@@ -138,6 +142,9 @@ export function PushSettings({
         await deletePushSubscription(sub.endpoint);
         await sub.unsubscribe();
       }
+      if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+        posthog.capture("push_notifications_disabled");
+      }
       setSubscribed(false);
     });
   }
@@ -147,6 +154,9 @@ export function PushSettings({
     void run(async () => {
       setMessage(`Leave the app or lock your phone now: the test arrives in ${TEST_DELAY} seconds.`);
       setMessage(describe(await sendTestPush(TEST_DELAY)));
+      if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+        posthog.capture("push_notification_test_sent");
+      }
     });
   }
 
@@ -217,6 +227,9 @@ function Toggle({
         onChange={(e) => {
           const next = e.target.checked;
           setOn(next);
+          if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+            posthog.capture("notification_preference_changed", { notification_kind: kind, enabled: next });
+          }
           start(() => setNotificationSetting(kind, next));
         }}
         className="mt-1 h-4 w-4 accent-[var(--accent)]"

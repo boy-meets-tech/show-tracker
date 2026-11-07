@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import posthog from "posthog-js";
 
 const noop = () => () => {};
 const STORAGE_KEY = "invite-message";
@@ -33,6 +34,9 @@ export function CopyInvite({ code, expiresAt }: { code: string; expiresAt: strin
   }
 
   async function share() {
+    if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+      posthog.capture("invite_shared");
+    }
     const text = message.trim();
     const full = text ? `${text}\n\n${url}` : url;
 
