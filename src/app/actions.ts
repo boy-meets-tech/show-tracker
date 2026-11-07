@@ -233,16 +233,19 @@ export async function updateProfile(_prev: ActionState, formData: FormData): Pro
 
 // --- Notifications -----------------------------------------------------------
 
-export async function savePushSubscription(sub: {
-  endpoint: string;
-  keys: { p256dh: string; auth: string };
-}) {
+// Saves this device's notification registration. deviceId is a random id the
+// device keeps, so a newer registration replaces the same device's old one.
+export async function savePushSubscription(
+  sub: { endpoint: string; keys: { p256dh: string; auth: string } },
+  deviceId?: string
+) {
   await getMyId();
   const supabase = await createClient();
   const { error } = await supabase.rpc("save_push_subscription", {
     sub_endpoint: sub.endpoint,
     sub_p256dh: sub.keys.p256dh,
     sub_auth: sub.keys.auth,
+    sub_device: deviceId && /^[A-Za-z0-9-]{8,64}$/.test(deviceId) ? deviceId : null,
   });
   if (error) throw new Error("Couldn't turn on notifications for this device.");
 }

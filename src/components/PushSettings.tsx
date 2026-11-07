@@ -52,6 +52,21 @@ function base64UrlToBytes(value: string) {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
+// A random id for this device, kept in its storage, so re-registering
+// replaces this device's old registration instead of adding another.
+function deviceId(): string | undefined {
+  try {
+    let id = localStorage.getItem("push-device-id");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("push-device-id", id);
+    }
+    return id;
+  } catch {
+    return undefined;
+  }
+}
+
 async function registration() {
   return (
     (await navigator.serviceWorker.getRegistration("/")) ??
@@ -93,7 +108,7 @@ export function PushSettings({
       setBlocked(Notification.permission === "denied");
       setSubscribed(Boolean(sub));
       // Keep the server's copy fresh in case it was cleared.
-      if (sub) await savePushSubscription(sub.toJSON() as Parameters<typeof savePushSubscription>[0]);
+      if (sub) await savePushSubscription(sub.toJSON() as Parameters<typeof savePushSubscription>[0], deviceId());
     })().catch(() => !cancelled && setSubscribed(false));
     return () => {
       cancelled = true;
@@ -118,7 +133,7 @@ export function PushSettings({
             userVisibleOnly: true,
             applicationServerKey: base64UrlToBytes(publicKey),
           }));
-        await savePushSubscription(sub.toJSON() as Parameters<typeof savePushSubscription>[0]);
+        await savePushSubscription(sub.toJSON() as Parameters<typeof savePushSubscription>[0], deviceId());
         setSubscribed(true);
         track("notifications_enabled");
         setMessage(
