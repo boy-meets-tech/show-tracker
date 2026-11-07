@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Form from "next/form";
 import Link from "next/link";
 import {
   acceptFriendRequest,
@@ -8,7 +9,7 @@ import {
 } from "@/app/actions";
 import { Avatar } from "@/components/Avatar";
 import { CopyInvite } from "@/components/CopyInvite";
-import { FriendRequestForm } from "@/components/FriendRequestForm";
+import { PersonAction, type Relation } from "@/components/PersonAction";
 import { Card, Empty, PageTitle, Skeleton } from "@/components/Section";
 import { getMe } from "@/lib/auth";
 import { listFriends } from "@/lib/friends";
@@ -17,16 +18,18 @@ import type { ProfileRow } from "@/lib/types";
 
 export const metadata = { title: "Friends" };
 
-export default function FriendsPage() {
+export default function FriendsPage({ searchParams }: PageProps<"/friends">) {
   return (
     <>
       <PageTitle>Friends</PageTitle>
       <Suspense fallback={<Skeleton rows={5} />}>
-        <Friends />
+        <Friends searchParams={searchParams} />
       </Suspense>
     </>
   );
 }
+
+type PersonResult = ProfileRow & { relation: Relation };
 
 type RequestRow = {
   from_id: string;
@@ -35,10 +38,12 @@ type RequestRow = {
   to: ProfileRow;
 };
 
-async function Friends() {
+async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchParams">) {
+  const raw = (await searchParams).q;
+  const q = typeof raw === "string" ? raw.trim().slice(0, 50) : "";
   const me = await getMe();
   const supabase = await createClient();
-  const [friends, { data: requestData }, { data: invite }] = await Promise.all([
+  const [friends, { data: requestData }, { data: invite }, { data: found }] = await Promise.all([
     listFriends(me.id),
     supabase
       .from("friend_requests")
@@ -47,7 +52,9 @@ async function Friends() {
       )
       .order("created_at", { ascending: false }),
     currentInvite(me.id),
+    q.length >= 2 ? supabase.rpc("search_people", { query: q }) : Promise.resolve({ data: null }),
   ]);
+  const people = (found ?? []) as PersonResult[];
   const requests = (requestData ?? []) as unknown as RequestRow[];
   const incoming = requests.filter((r) => r.to_id === me.id);
   const outgoing = requests.filter((r) => r.from_id === me.id);
@@ -65,12 +72,43 @@ async function Friends() {
             <button className="btn-primary">Create invite link</button>
           </form>
         )}
-        <div className="mt-5 border-t border-border pt-4">
-          <p className="mb-2 text-sm text-muted">
-            Or add someone by username. Yours is <strong className="text-foreground">@{me.username}</strong>.
-          </p>
-          <FriendRequestForm />
-        </div>
+      </Card>
+
+      <Card title="Find people">
+        <Form action="/friends" className="flex gap-2">
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="Search by name or username"
+            className="input"
+            type="search"
+            autoCapitalize="none"
+            autoCorrect="off"
+          />
+          <button className="btn-secondary shrink-0">Search</button>
+        </Form>
+        <p className="mt-2 text-xs text-muted">
+          Close spellings work too. Your username is{" "}
+          <strong className="text-foreground">@{me.username}</strong>.
+        </p>
+        {q ? (
+          people.length === 0 ? (
+            <Empty>No one found matching “{q}”.</Empty>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {people.map((p) => (
+                <li key={p.id} className="flex items-center gap-3">
+                  <Link href={`/u/${p.username}`} className="hover:underline">
+                    <PersonLabel person={p} />
+                  </Link>
+                  <div className="ml-auto">
+                    <PersonAction meId={me.id} person={p} relation={p.relation} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : null}
       </Card>
 
       {incoming.length ? (

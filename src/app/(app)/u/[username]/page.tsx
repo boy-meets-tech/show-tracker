@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ActivityItem } from "@/components/ActivityItem";
 import { Avatar } from "@/components/Avatar";
-import { FriendRequestForm } from "@/components/FriendRequestForm";
+import { PersonAction, type Relation } from "@/components/PersonAction";
 import { Library } from "@/components/Library";
 import { Card, Empty, Skeleton } from "@/components/Section";
 import { getMe } from "@/lib/auth";
@@ -33,6 +33,17 @@ async function Profile({ params }: Pick<PageProps<"/u/[username]">, "params">) {
   const { data: friends } = await supabase.rpc("are_friends", { a: me.id, b: person.id });
   const canSee = isMe || friends === true;
 
+  let relation: Relation = friends === true ? "friend" : "none";
+  if (!canSee) {
+    const { data: reqs } = await supabase
+      .from("friend_requests")
+      .select("from_id")
+      .or(`from_id.eq.${person.id},to_id.eq.${person.id}`);
+    const rows = (reqs ?? []) as { from_id: string }[];
+    if (rows.some((r) => r.from_id === person.id)) relation = "received";
+    else if (rows.length) relation = "sent";
+  }
+
   return (
     <>
       <div className="mb-6 flex items-center gap-4">
@@ -46,9 +57,9 @@ async function Profile({ params }: Pick<PageProps<"/u/[username]">, "params">) {
       {!canSee ? (
         <Card title={`You're not friends with ${person.display_name} yet`}>
           <p className="mb-3 text-sm text-muted">
-            Only friends can see what someone is watching. Send a friend request:
+            Only friends can see what someone is watching.
           </p>
-          <FriendRequestForm />
+          <PersonAction meId={me.id} person={person} relation={relation} />
         </Card>
       ) : (
         <>

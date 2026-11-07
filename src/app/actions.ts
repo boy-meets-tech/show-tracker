@@ -120,20 +120,12 @@ export async function dismissRecommendation(id: number) {
 
 // --- Friends -----------------------------------------------------------------
 
-export async function sendFriendRequest(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
+// One-tap "Add friend" from search results and profiles.
+export async function addFriend(username: string) {
   await getMe();
-  const username = String(formData.get("username") ?? "").trim().replace(/^@/, "");
-  if (!username) return { error: "Enter a username." };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("send_friend_request", { target_username: username });
-  if (error) return { error: error.message };
+  await supabase.rpc("send_friend_request", { target_username: username });
   refresh();
-  if (data === "accepted") return { ok: `You and @${username} are now friends.` };
-  if (data === "already_friends") return { ok: `You're already friends with @${username}.` };
-  return { ok: `Request sent to @${username}.` };
 }
 
 export async function acceptFriendRequest(requesterId: string) {
