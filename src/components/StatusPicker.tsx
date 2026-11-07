@@ -2,6 +2,7 @@
 
 import { useOptimistic, useTransition } from "react";
 import { setStatus } from "@/app/actions";
+import { track } from "@/lib/analytics";
 import { STATUSES, STATUS_LABEL, type WatchStatus } from "@/lib/labels";
 
 // Highlights the chosen status immediately, then saves in the background.
@@ -11,6 +12,7 @@ export function StatusPicker({ titleId, status }: { titleId: string; status: Wat
 
   function choose(next: WatchStatus) {
     if (next === optimistic) return;
+    track("show_status_set", { status: next, first_time: optimistic === null, media: titleId.split("-")[0] });
     startTransition(async () => {
       setOptimistic(next);
       const fd = new FormData();

@@ -20,13 +20,13 @@ export function Avatar({
       width={size}
       height={size}
       referrerPolicy="no-referrer"
-      className="shrink-0 rounded-full object-cover"
+      className="ph-no-capture shrink-0 rounded-full object-cover"
       style={{ width: size, height: size }}
     />
   ) : (
     <span
       aria-hidden
-      className="flex shrink-0 items-center justify-center rounded-full bg-accent-soft font-semibold text-accent"
+      className="ph-mask flex shrink-0 items-center justify-center rounded-full bg-accent-soft font-semibold text-accent"
       style={{ width: size, height: size, fontSize: size * 0.4 }}
     >
       {initials}

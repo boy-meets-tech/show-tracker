@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { resetAnalytics, track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 
 function safeNext(next: string | null) {
@@ -21,10 +22,14 @@ export function LoginForm() {
   );
   const [sent, setSent] = useState(false);
 
+  // Signed out: stop linking this device's sessions to the previous user.
+  useEffect(() => resetAnalytics(), []);
+
   const callbackUrl = () =>
     `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
   async function google() {
+    track("sign_in_started", { method: "google" });
     setBusy("google");
     const { error } = await createClient().auth.signInWithOAuth({
       provider: "google",
@@ -37,6 +42,7 @@ export function LoginForm() {
   }
 
   async function passkey() {
+    track("sign_in_started", { method: "passkey" });
     setBusy("passkey");
     setMessage(null);
     const { error } = await createClient().auth.signInWithPasskey();
@@ -53,6 +59,7 @@ export function LoginForm() {
 
   async function magicLink(e: React.FormEvent) {
     e.preventDefault();
+    track("sign_in_started", { method: "email" });
     setBusy("email");
     setMessage(null);
     const { error } = await createClient().auth.signInWithOtp({

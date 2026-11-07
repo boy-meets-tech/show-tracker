@@ -3,6 +3,7 @@
 import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Suspense } from "react";
+import { StartAnalytics } from "./Analytics";
 
 // Report pages by their pattern, not their exact address, so private bits
 // (invite codes, usernames, search terms) never leave the device.
@@ -28,6 +29,7 @@ export function Telemetry() {
     <Suspense>
       <Analytics beforeSend={beforeSend} />
       <SpeedInsights beforeSend={(e) => ({ ...e, url: scrub(e.url) })} />
+      <StartAnalytics />
     </Suspense>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { recommend, type ActionState } from "@/app/actions";
+import { track } from "@/lib/analytics";
 import { Avatar } from "./Avatar";
 
 type Friend = {
@@ -19,7 +20,17 @@ export function RecommendForm({ titleId, friends }: { titleId: string; friends: 
   );
 
   return (
-    <form action={action} className="space-y-3">
+    <form
+      action={action}
+      onSubmit={(e) => {
+        const data = new FormData(e.currentTarget);
+        track("recommendation_sent", {
+          friends: data.getAll("friend").length,
+          with_note: String(data.get("note") ?? "").trim().length > 0,
+        });
+      }}
+      className="space-y-3"
+    >
       <div className="flex flex-wrap gap-2">
         {friends.map((f) => (
           <label
@@ -31,7 +42,7 @@ export function RecommendForm({ titleId, friends }: { titleId: string; friends: 
           >
             <input type="checkbox" name="friend" value={f.id} className="sr-only" disabled={f.alreadySent} />
             <Avatar name={f.display_name} url={f.avatar_url} size={24} />
-            {f.display_name}
+            <span className="ph-mask">{f.display_name}</span>
             {f.alreadySent ? " ✓" : ""}
           </label>
         ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { track } from "@/lib/analytics";
 
 const noop = () => () => {};
 const STORAGE_KEY = "invite-message";
@@ -35,6 +36,7 @@ export function CopyInvite({ code, expiresAt }: { code: string; expiresAt: strin
   async function share() {
     const text = message.trim();
     const full = text ? `${text}\n\n${url}` : url;
+    track("invite_shared", { custom_message: text !== DEFAULT_MESSAGE });
 
     // Always copy the message and link together first.
     try {

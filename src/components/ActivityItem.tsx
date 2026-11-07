@@ -21,7 +21,7 @@ export function ActivityItem({ item, showUser = true }: { item: ActivityRow; sho
         <p>
           {showUser ? (
             <Link href={`/u/${who.username}`} className="font-semibold hover:underline">
-              {who.display_name}
+              <span className="ph-mask">{who.display_name}</span>
             </Link>
           ) : (
             <span className="font-semibold">You</span>

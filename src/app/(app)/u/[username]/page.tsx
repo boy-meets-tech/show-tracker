@@ -49,13 +49,13 @@ async function Profile({ params }: Pick<PageProps<"/u/[username]">, "params">) {
       <div className="mb-6 flex items-center gap-4">
         <Avatar name={person.display_name} url={person.avatar_url} size={64} />
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{person.display_name}</h1>
-          <p className="text-sm text-muted">@{person.username}</p>
+          <h1 className="ph-mask text-2xl font-bold tracking-tight">{person.display_name}</h1>
+          <p className="ph-mask text-sm text-muted">@{person.username}</p>
         </div>
       </div>
 
       {!canSee ? (
-        <Card title={`You're not friends with ${person.display_name} yet`}>
+        <Card title={<span className="ph-mask">You&apos;re not friends with {person.display_name} yet</span>}>
           <p className="mb-3 text-sm text-muted">
             Only friends can see what someone is watching.
           </p>

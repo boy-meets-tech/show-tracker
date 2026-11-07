@@ -2,12 +2,14 @@
 
 import { useOptimistic, useTransition } from "react";
 import { setRating } from "@/app/actions";
+import { track } from "@/lib/analytics";
 
 export function RatingPicker({ titleId, rating }: { titleId: string; rating: number | null }) {
   const [optimistic, setOptimistic] = useOptimistic(rating);
   const [, startTransition] = useTransition();
 
   function choose(value: number | null) {
+    track(value === null ? "rating_cleared" : "show_rated", value === null ? undefined : { rating: value });
     startTransition(async () => {
       setOptimistic(value);
       const fd = new FormData();

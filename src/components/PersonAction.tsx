@@ -19,7 +19,7 @@ export function PersonAction({
   if (relation === "received") {
     return (
       <form action={acceptFriendRequest.bind(null, person.id)}>
-        <SubmitButton className="btn-primary py-1.5">Accept</SubmitButton>
+        <SubmitButton className="btn-primary py-1.5" event="friend_request_accepted">Accept</SubmitButton>
       </form>
     );
   }
@@ -34,7 +34,7 @@ export function PersonAction({
   }
   return (
     <form action={addFriend.bind(null, person.username)}>
-      <SubmitButton className="btn-primary py-1.5" pendingText="Adding…">Add friend</SubmitButton>
+      <SubmitButton className="btn-primary py-1.5" pendingText="Adding…" event="friend_request_sent">Add friend</SubmitButton>
     </form>
   );
 }

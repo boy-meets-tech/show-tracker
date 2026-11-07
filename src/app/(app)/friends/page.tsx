@@ -71,7 +71,7 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
           <CopyInvite code={invite.code} expiresAt={invite.expires_at} />
         ) : (
           <form action={createInvite}>
-            <SubmitButton pendingText="Creating…">Create invite link</SubmitButton>
+            <SubmitButton pendingText="Creating…" event="invite_link_created">Create invite link</SubmitButton>
           </form>
         )}
       </Card>
@@ -87,11 +87,11 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
             autoCapitalize="none"
             autoCorrect="off"
           />
-          <SubmitButton className="btn-secondary shrink-0" pendingText="Searching…">Search</SubmitButton>
+          <SubmitButton className="btn-secondary shrink-0" pendingText="Searching…" event="people_searched">Search</SubmitButton>
         </Form>
         <p className="mt-2 text-xs text-muted">
           Close spellings work too. Your username is{" "}
-          <strong className="text-foreground">@{me.username}</strong>.
+          <strong className="ph-mask text-foreground">@{me.username}</strong>.
         </p>
         {q ? (
           people.length === 0 ? (
@@ -120,7 +120,7 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
               <li key={r.from_id} className="flex items-center gap-3">
                 <PersonLabel person={r.from} />
                 <form action={acceptFriendRequest.bind(null, r.from_id)} className="ml-auto">
-                  <SubmitButton className="btn-primary py-1.5">Accept</SubmitButton>
+                  <SubmitButton className="btn-primary py-1.5" event="friend_request_accepted">Accept</SubmitButton>
                 </form>
                 <form action={deleteFriendRequest.bind(null, r.from_id, me.id)}>
                   <SubmitButton className="btn-secondary py-1.5">Decline</SubmitButton>
@@ -187,8 +187,8 @@ function PersonLabel({ person }: { person: ProfileRow }) {
     <span className="flex items-center gap-3">
       <Avatar name={person.display_name} url={person.avatar_url} size={36} />
       <span>
-        <span className="block text-sm font-medium">{person.display_name}</span>
-        <span className="block text-xs text-muted">@{person.username}</span>
+        <span className="ph-mask block text-sm font-medium">{person.display_name}</span>
+        <span className="ph-mask block text-xs text-muted">@{person.username}</span>
       </span>
     </span>
   );

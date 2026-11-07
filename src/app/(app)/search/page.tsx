@@ -35,7 +35,7 @@ function SearchBox({ q = "" }: { q?: string }) {
         autoFocus
         type="search"
       />
-      <SubmitButton className="btn-primary shrink-0" pendingText="Searching…">Search</SubmitButton>
+      <SubmitButton className="btn-primary shrink-0" pendingText="Searching…" event="titles_searched">Search</SubmitButton>
     </Form>
   );
 }

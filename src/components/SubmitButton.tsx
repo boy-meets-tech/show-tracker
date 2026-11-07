@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { track } from "@/lib/analytics";
 
 // A form button that reacts the instant it's tapped: it dims, shows a small
 // spinner and can't be tapped twice while the action runs.
@@ -9,11 +10,14 @@ export function SubmitButton({
   className = "btn-primary",
   pendingText,
   title,
+  event,
 }: {
   children: React.ReactNode;
   className?: string;
   pendingText?: string;
   title?: string;
+  // Analytics event to record when tapped, e.g. "friend_request_sent".
+  event?: string;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -22,6 +26,7 @@ export function SubmitButton({
       disabled={pending}
       aria-busy={pending}
       title={title}
+      onClick={event ? () => track(event) : undefined}
       className={`${className} ${pending ? "cursor-wait opacity-60" : ""}`}
     >
       {pending ? (

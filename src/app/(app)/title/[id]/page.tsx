@@ -120,8 +120,8 @@ async function Social({ titleId }: { titleId: string }) {
             <div key={r.from_id} className="flex gap-3 rounded-xl bg-accent-soft p-3 text-sm">
               <Avatar name={r.profiles.display_name} url={r.profiles.avatar_url} size={28} />
               <div>
-                <strong>{r.profiles.display_name}</strong> recommended this to you
-                {r.note ? <p className="mt-0.5 italic">“{r.note}”</p> : null}
+                <strong className="ph-mask">{r.profiles.display_name}</strong> recommended this to you
+                {r.note ? <p className="ph-mask mt-0.5 italic">“{r.note}”</p> : null}
               </div>
             </div>
           ))}
@@ -149,7 +149,7 @@ async function Social({ titleId }: { titleId: string }) {
               <li key={e.profiles.id} className="flex items-center gap-3 text-sm">
                 <Avatar name={e.profiles.display_name} url={e.profiles.avatar_url} size={28} />
                 <Link href={`/u/${e.profiles.username}`} className="font-medium hover:underline">
-                  {e.profiles.display_name}
+                  <span className="ph-mask">{e.profiles.display_name}</span>
                 </Link>
                 <span className="text-muted">{STATUS_LABEL[e.status]}</span>
                 {e.rating ? (

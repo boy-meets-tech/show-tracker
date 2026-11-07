@@ -81,14 +81,14 @@ async function Recs() {
                     <div className="mt-1 flex items-center gap-1.5 text-xs">
                       <Avatar name={r.profiles.display_name} url={r.profiles.avatar_url} size={16} />
                       <span>
-                        From <strong>{r.profiles.display_name}</strong> · {timeAgo(r.created_at)}
+                        From <strong className="ph-mask">{r.profiles.display_name}</strong> · {timeAgo(r.created_at)}
                       </span>
                     </div>
-                    {r.note ? <p className="mt-1 text-sm italic">“{r.note}”</p> : null}
+                    {r.note ? <p className="ph-mask mt-1 text-sm italic">“{r.note}”</p> : null}
                   </TitleRow>
                 </div>
                 <form action={dismissRecommendation.bind(null, r.id)}>
-                  <SubmitButton className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted underline hover:text-foreground">Dismiss</SubmitButton>
+                  <SubmitButton event="recommendation_dismissed" className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted underline hover:text-foreground">Dismiss</SubmitButton>
                 </form>
               </li>
             ))}
@@ -117,7 +117,7 @@ async function Recs() {
                 <p className="mt-1 text-xs">
                   <span className="font-semibold text-accent">{p.avg_rating}/10</span>{" "}
                   <span className="text-muted">
-                    from {formatNames(p.friend_names)}
+                    from <span className="ph-mask">{formatNames(p.friend_names)}</span>
                   </span>
                 </p>
               </TitleRow>

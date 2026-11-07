@@ -8,6 +8,7 @@ import {
   setNotificationSetting,
 } from "@/app/actions";
 import type { NotificationKind, PushResult } from "@/lib/push";
+import { track } from "@/lib/analytics";
 
 type Settings = Record<NotificationKind, boolean>;
 
@@ -119,6 +120,7 @@ export function PushSettings({
           }));
         await savePushSubscription(sub.toJSON() as Parameters<typeof savePushSubscription>[0]);
         setSubscribed(true);
+        track("notifications_enabled");
         setMessage(
           `Done! Leave the app or lock your phone now: a test notification arrives in ${TEST_DELAY} seconds.`
         );

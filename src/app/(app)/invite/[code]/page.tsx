@@ -55,13 +55,13 @@ async function Invite({ params, searchParams }: PageProps<"/invite/[code]">) {
       <div className="flex flex-col items-center py-4 text-center">
         <Avatar name={inviter.display_name} url={inviter.avatar_url} size={72} />
         <h1 className="mt-4 text-xl font-bold">
-          {inviter.display_name} invited you to be friends
+          <span className="ph-mask">{inviter.display_name}</span> invited you to be friends
         </h1>
         <p className="mt-1 text-sm text-muted">
           You&apos;ll see what each other are watching and can swap recommendations.
         </p>
         <form action={acceptInvite.bind(null, code)} className="mt-6">
-          <SubmitButton className="btn-primary px-6 py-2.5" pendingText="Joining…">Accept invite</SubmitButton>
+          <SubmitButton className="btn-primary px-6 py-2.5" pendingText="Joining…" event="invite_accepted">Accept invite</SubmitButton>
         </form>
       </div>
     </Card>
