@@ -265,9 +265,12 @@ export async function setNotificationSetting(kind: NotificationKind, enabled: bo
   refresh();
 }
 
-export async function sendTestPush() {
+// Sends a test to your own devices. Waits a few seconds first, because
+// iPhones usually don't show a web app's notification while it's on screen.
+export async function sendTestPush(delaySeconds = 0) {
   const me = { id: await getMyId() };
-  await notify([me.id], null, {
+  if (delaySeconds > 0) await new Promise((r) => setTimeout(r, Math.min(delaySeconds, 10) * 1000));
+  return notify([me.id], null, {
     title: "Notifications are on",
     body: "You'll hear about friend requests, recommendations and what your friends watch.",
     url: "/settings",

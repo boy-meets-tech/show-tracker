@@ -7,7 +7,7 @@ import {
   sendTestPush,
   setNotificationSetting,
 } from "@/app/actions";
-import type { NotificationKind } from "@/lib/push";
+import type { NotificationKind, PushResult } from "@/lib/push";
 
 type Settings = Record<NotificationKind, boolean>;
 
@@ -19,6 +19,15 @@ const OPTIONS: { kind: NotificationKind; label: string; hint: string }[] = [
 ];
 
 const noop = () => () => {};
+
+const TEST_DELAY = 5;
+
+function describe(result: PushResult) {
+  if (result.sent > 0) {
+    return "Delivered to Apple/Google. If nothing appeared, check that notifications are allowed for Show Tracker in your phone's Settings → Notifications.";
+  }
+  return `It didn't go through: ${result.problem ?? "unknown problem"}.`;
+}
 
 // What this device can do, read once on the client.
 function deviceSupport(): "unsupported" | "ios-browser" | "ok" {
@@ -60,7 +69,17 @@ export function PushSettings({
   const [subscribed, setSubscribed] = useState<boolean | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, startBusy] = useTransition();
+  const [busy, setBusy] = useState(false);
+
+  // Plain async (not a transition) so progress messages show immediately.
+  async function run(task: () => Promise<void>) {
+    setBusy(true);
+    try {
+      await task();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // Is this device already set up?
   useEffect(() => {
@@ -82,7 +101,7 @@ export function PushSettings({
 
   function turnOn() {
     setMessage(null);
-    startBusy(async () => {
+    void run(async () => {
       try {
         if (!publicKey) throw new Error("Notifications aren't set up on the server yet.");
         const permission = await Notification.requestPermission();
@@ -100,8 +119,10 @@ export function PushSettings({
           }));
         await savePushSubscription(sub.toJSON() as Parameters<typeof savePushSubscription>[0]);
         setSubscribed(true);
-        await sendTestPush();
-        setMessage("Done! A test notification is on its way.");
+        setMessage(
+          `Done! Leave the app or lock your phone now: a test notification arrives in ${TEST_DELAY} seconds.`
+        );
+        setMessage(describe(await sendTestPush(TEST_DELAY)));
       } catch (e) {
         setMessage((e as Error).message || "Something went wrong. Try again.");
       }
@@ -110,7 +131,7 @@ export function PushSettings({
 
   function turnOff() {
     setMessage(null);
-    startBusy(async () => {
+    void run(async () => {
       const reg = await registration();
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
@@ -123,9 +144,9 @@ export function PushSettings({
 
   function test() {
     setMessage(null);
-    startBusy(async () => {
-      await sendTestPush();
-      setMessage("Sent. It should arrive in a few seconds.");
+    void run(async () => {
+      setMessage(`Leave the app or lock your phone now: the test arrives in ${TEST_DELAY} seconds.`);
+      setMessage(describe(await sendTestPush(TEST_DELAY)));
     });
   }
 
@@ -152,7 +173,7 @@ export function PushSettings({
             <span className="text-green-600">●</span> On for this device
           </span>
           <button onClick={test} disabled={busy} className="btn-secondary ml-auto py-1.5">
-            Send a test
+            {busy ? "Sending…" : "Send a test"}
           </button>
           <button onClick={turnOff} disabled={busy} className="btn-secondary py-1.5">
             Turn off

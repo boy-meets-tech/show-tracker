@@ -88,51 +88,81 @@ const SUBJECT = process.env.VERCEL_PROJECT_PRODUCTION_URL
   ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   : "https://localhost";
 
+export type PushResult = { sent: number; failed: number; problem?: string };
+
 // Send to these people's devices, skipping anyone who turned this kind off.
 // Pass kind = null to ignore settings (used for the test notification).
-export async function notify(userIds: string[], kind: NotificationKind | null, message: PushMessage) {
+// Every send is logged, so delivery problems show up in the Vercel logs.
+export async function notify(
+  userIds: string[],
+  kind: NotificationKind | null,
+  message: PushMessage
+): Promise<PushResult> {
   const ids = [...new Set(userIds)];
+  const result = await deliver(ids, kind, message);
+  console.log(
+    `push: ${kind ?? "test"} to ${ids.length} user(s): sent ${result.sent}, failed ${result.failed}` +
+      (result.problem ? ` (${result.problem})` : "")
+  );
+  return result;
+}
+
+async function deliver(ids: string[], kind: NotificationKind | null, message: PushMessage): Promise<PushResult> {
+  const none = (problem?: string): PushResult => ({ sent: 0, failed: 0, problem });
+  if (ids.length === 0) return none();
   const db = admin();
+  if (!db) return none("server is missing its Supabase secret key");
   const keys = await vapidKeys();
-  if (!db || !keys || ids.length === 0) return;
+  if (!keys) return none("push keys couldn't be loaded");
 
   let recipients = ids;
   if (kind) {
-    const { data: off } = await db
+    const { data: off, error } = await db
       .from("notification_settings")
       .select("user_id")
       .in("user_id", ids)
       .eq(kind, false);
+    if (error) return none(`couldn't read settings: ${error.message}`);
     const muted = new Set((off ?? []).map((r: { user_id: string }) => r.user_id));
     recipients = ids.filter((id) => !muted.has(id));
   }
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) return none("everyone has this kind turned off");
 
-  const { data: subs } = await db
+  const { data: subs, error } = await db
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
     .in("user_id", recipients);
-  if (!subs?.length) return;
+  if (error) return none(`couldn't read devices: ${error.message}`);
+  if (!subs?.length) return none("no devices have notifications turned on");
 
   setVapidDetails(SUBJECT, keys.publicKey, keys.privateKey);
   const payload = JSON.stringify(message);
   const gone: string[] = [];
+  const problems: string[] = [];
+  let sent = 0;
   await Promise.all(
     subs.map(async (s: { endpoint: string; p256dh: string; auth: string }) => {
+      const service = new URL(s.endpoint).host;
       try {
-        await sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, {
-          TTL: 60 * 60 * 24,
-          urgency: "normal",
-        });
+        const res = await sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+          payload,
+          { TTL: 60 * 60 * 24, urgency: "high" }
+        );
+        sent++;
+        console.log(`push: ${service} accepted (${res.statusCode})`);
       } catch (e) {
-        const status = (e as { statusCode?: number }).statusCode;
+        const err = e as { statusCode?: number; body?: string; message?: string };
         // The device unsubscribed or the app was removed: forget it.
-        if (status === 404 || status === 410) gone.push(s.endpoint);
-        else console.error("push: send failed", status, (e as Error).message);
+        if (err.statusCode === 404 || err.statusCode === 410) gone.push(s.endpoint);
+        const why = `${service} said ${err.statusCode ?? "error"}${err.body ? `: ${err.body}` : ""}`;
+        problems.push(why);
+        console.error("push: send failed,", why, err.message ?? "");
       }
     })
   );
   if (gone.length) await db.from("push_subscriptions").delete().in("endpoint", gone);
+  return { sent, failed: subs.length - sent, problem: problems.join("; ") || undefined };
 }
 
 // --- Event helpers ------------------------------------------------------------
