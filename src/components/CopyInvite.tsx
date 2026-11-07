@@ -34,18 +34,26 @@ export function CopyInvite({ code, expiresAt }: { code: string; expiresAt: strin
 
   async function share() {
     const text = message.trim();
+    const full = text ? `${text}\n\n${url}` : url;
+
+    // Always copy the message and link together first.
+    try {
+      await navigator.clipboard.writeText(full);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Clipboard blocked: the share sheet below still works.
+    }
+
+    // Then open the phone's share sheet. The link goes inside the text (not as
+    // a separate URL) so apps don't drop the message and send the bare link.
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Join me on Show Tracker", text, url });
-        return;
-      } catch (e) {
-        // Closing the share sheet isn't an error; anything else falls back to copying.
-        if ((e as Error).name === "AbortError") return;
+        await navigator.share({ text: full });
+      } catch {
+        // Share sheet closed: the text is already copied.
       }
     }
-    await navigator.clipboard.writeText(text ? `${text}\n\n${url}` : url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -73,7 +81,8 @@ export function CopyInvite({ code, expiresAt }: { code: string; expiresAt: strin
         </button>
       </div>
       <p className="text-xs text-muted">
-        Your message is sent along with the link. Works until{" "}
+        {copied ? "Message and link copied. Paste them anywhere. " : "Share copies your message and the link together. "}
+        Works until{" "}
         {new Date(expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
       </p>
     </div>
