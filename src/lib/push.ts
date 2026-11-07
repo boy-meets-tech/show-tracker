@@ -21,7 +21,10 @@ let adminClient: SupabaseClient | null = null;
 function admin(): SupabaseClient | null {
   const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  if (!key || !url) return null;
+  if (!key || !url) {
+    console.error("push: SUPABASE_SECRET_KEY or the Supabase URL is missing");
+    return null;
+  }
   adminClient ??= createClient(url, key, { auth: { persistSession: false } });
   return adminClient;
 }
@@ -35,10 +38,11 @@ async function loadVapidKeys(): Promise<VapidKeys | null> {
   const db = admin();
   if (!db) return null;
   const read = async () => {
-    const { data } = await db
+    const { data, error } = await db
       .from("app_secrets")
       .select("name, value")
       .in("name", ["vapid_public_key", "vapid_private_key"]);
+    if (error) console.error("push: could not read keys", error.message);
     const rows = new Map((data ?? []).map((r: { name: string; value: string }) => [r.name, r.value]));
     const publicKey = rows.get("vapid_public_key");
     const privateKey = rows.get("vapid_private_key");
@@ -50,22 +54,28 @@ async function loadVapidKeys(): Promise<VapidKeys | null> {
 
   const fresh = generateVAPIDKeys();
   // If two servers race here, the first insert wins and both read it back.
-  await db.from("app_secrets").upsert(
+  const { error: saveError } = await db.from("app_secrets").upsert(
     [
       { name: "vapid_public_key", value: fresh.publicKey },
       { name: "vapid_private_key", value: fresh.privateKey },
     ],
     { onConflict: "name", ignoreDuplicates: true }
   );
+  if (saveError) console.error("push: could not save keys", saveError.message);
   return read();
 }
 
 function vapidKeys() {
-  vapid ??= loadVapidKeys().catch((e) => {
-    vapid = null;
-    console.error("push: could not load keys", e);
-    return null;
-  });
+  // Remember the keys once loaded, but retry next time if loading failed.
+  vapid ??= loadVapidKeys()
+    .catch((e) => {
+      console.error("push: could not load keys", e);
+      return null;
+    })
+    .then((keys) => {
+      if (!keys) vapid = null;
+      return keys;
+    });
   return vapid;
 }
 
