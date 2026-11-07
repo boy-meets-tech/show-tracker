@@ -278,6 +278,15 @@ export async function sendTestPush(delaySeconds = 0) {
   });
 }
 
+// "Where to watch" country; null means detect it automatically.
+export async function setWatchCountry(country: string | null) {
+  const me = { id: await getMyId() };
+  if (country !== null && !/^[A-Z]{2}$/.test(country)) return;
+  const supabase = await createClient();
+  await supabase.from("profiles").update({ country }).eq("id", me.id);
+  refresh();
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

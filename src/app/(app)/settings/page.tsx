@@ -1,11 +1,14 @@
 import { Suspense } from "react";
 import { signOut } from "@/app/actions";
+import { CountryPicker } from "@/components/CountryPicker";
 import { PasskeyButton } from "@/components/PasskeyButton";
 import { ProfileForm } from "@/components/ProfileForm";
 import { PushSettings } from "@/components/PushSettings";
 import { Card, PageTitle, Skeleton } from "@/components/Section";
 import { getMe, getMyId } from "@/lib/auth";
+import { countryName, detectedCountry } from "@/lib/country";
 import { vapidPublicKey } from "@/lib/push";
+import { watchCountries } from "@/lib/tmdb";
 import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/SubmitButton";
 
@@ -25,7 +28,7 @@ export default function SettingsPage() {
 async function Settings() {
   const myId = await getMyId();
   const supabase = await createClient();
-  const [me, { data: prefs }, publicKey] = await Promise.all([
+  const [me, { data: prefs }, publicKey, detected, countries] = await Promise.all([
     getMe(),
     supabase
       .from("notification_settings")
@@ -33,11 +36,21 @@ async function Settings() {
       .eq("user_id", myId)
       .maybeSingle(),
     vapidPublicKey(),
+    detectedCountry(),
+    watchCountries(),
   ]);
   return (
     <>
       <Card title="Profile">
         <ProfileForm username={me.username} displayName={me.display_name} />
+      </Card>
+      <Card title="Where to watch">
+        <CountryPicker
+          current={me.country}
+          detected={detected}
+          detectedName={countryName(detected)}
+          countries={countries}
+        />
       </Card>
       <Card title="Notifications">
         <PushSettings

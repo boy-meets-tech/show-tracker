@@ -8,6 +8,7 @@ export type Profile = {
   username: string;
   display_name: string;
   avatar_url: string | null;
+  country: string | null; // chosen "Where to watch" country, or null for automatic
 };
 
 // The signed-in user's id. Checks the sign-in token locally (no call to the
@@ -32,7 +33,7 @@ export const getMe = cache(async (): Promise<Profile> => {
   const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url")
+    .select("id, username, display_name, avatar_url, country")
     .eq("id", id)
     .single();
   if (!profile) redirect("/login");

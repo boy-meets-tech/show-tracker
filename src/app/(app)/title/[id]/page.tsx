@@ -7,6 +7,7 @@ import { Poster } from "@/components/Poster";
 import { RatingPicker } from "@/components/RatingPicker";
 import { RecommendForm } from "@/components/RecommendForm";
 import { StatusPicker } from "@/components/StatusPicker";
+import { WhereToWatch } from "@/components/WhereToWatch";
 import { Card, Skeleton } from "@/components/Section";
 import { getMyId } from "@/lib/auth";
 import { listFriends } from "@/lib/friends";
@@ -139,6 +140,10 @@ async function Social({ titleId }: { titleId: string }) {
           ) : null}
         </div>
       </Card>
+
+      <Suspense fallback={<Skeleton rows={1} />}>
+        <WhereToWatch titleId={titleId} />
+      </Suspense>
 
       <Card title="Friends">
         {theirs.length === 0 ? (

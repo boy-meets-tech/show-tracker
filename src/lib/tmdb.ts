@@ -211,3 +211,76 @@ export async function getTitleDetails(id: string): Promise<TitleDetails | null> 
     status: raw.status ?? null,
   };
 }
+
+// --- Where to watch (data from JustWatch, via TMDB) ----------------------------
+
+export type Provider = { id: number; name: string; logoPath: string | null };
+
+export type WatchOptions = {
+  link: string | null; // TMDB page listing every option for this title
+  stream: Provider[]; // included with a subscription
+  free: Provider[]; // free, or free with ads
+  rentOrBuy: Provider[];
+};
+
+type RawProvider = { provider_id: number; provider_name: string; logo_path: string | null; display_priority?: number };
+type RawRegion = {
+  link?: string;
+  flatrate?: RawProvider[];
+  free?: RawProvider[];
+  ads?: RawProvider[];
+  rent?: RawProvider[];
+  buy?: RawProvider[];
+};
+
+function providers(...lists: (RawProvider[] | undefined)[]): Provider[] {
+  const byId = new Map<number, RawProvider>();
+  for (const p of lists.flat()) if (p && !byId.has(p.provider_id)) byId.set(p.provider_id, p);
+  return [...byId.values()]
+    .sort((a, b) => (a.display_priority ?? 99) - (b.display_priority ?? 99))
+    .map((p) => ({ id: p.provider_id, name: p.provider_name, logoPath: p.logo_path }));
+}
+
+// Streaming availability changes, so refresh a few times a day.
+async function allWatchOptions(id: string): Promise<Record<string, RawRegion> | null> {
+  "use cache";
+  cacheLife("hours");
+  const parsed = parseTitleId(id);
+  if (!parsed) return null;
+  try {
+    const data = await tmdb<{ results?: Record<string, RawRegion> }>(
+      `/${parsed.mediaType}/${parsed.tmdbId}/watch/providers`
+    );
+    return data.results ?? {};
+  } catch {
+    return null;
+  }
+}
+
+export async function getWatchOptions(id: string, country: string): Promise<WatchOptions | null> {
+  const all = await allWatchOptions(id);
+  if (!all) return null;
+  const region = all[country] ?? {};
+  return {
+    link: region.link ?? null,
+    stream: providers(region.flatrate),
+    free: providers(region.free, region.ads),
+    rentOrBuy: providers(region.rent, region.buy),
+  };
+}
+
+// Countries TMDB has streaming data for, for the Settings picker.
+export async function watchCountries(): Promise<{ code: string; name: string }[]> {
+  "use cache";
+  cacheLife("days");
+  try {
+    const data = await tmdb<{ results: { iso_3166_1: string; english_name: string }[] }>(
+      "/watch/providers/regions"
+    );
+    return data.results
+      .map((r) => ({ code: r.iso_3166_1, name: r.english_name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
