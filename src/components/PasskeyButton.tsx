@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 
 export function PasskeyButton() {
@@ -14,6 +15,9 @@ export function PasskeyButton() {
       setError(error.message);
       setState("error");
     } else {
+      if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+        posthog.capture("passkey_added");
+      }
       setState("done");
     }
   }

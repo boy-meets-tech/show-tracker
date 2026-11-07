@@ -2,6 +2,7 @@
 // which bypasses row-level security, to look up other people's devices.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { generateVAPIDKeys, sendNotification, setVapidDetails } from "web-push";
+import { logPushDelivery } from "./posthog-logs";
 
 export type NotificationKind =
   | "friend_requests"
@@ -104,6 +105,7 @@ export async function notify(
     `push: ${kind ?? "test"} to ${ids.length} user(s): sent ${result.sent}, failed ${result.failed}` +
       (result.problem ? ` (${result.problem})` : "")
   );
+  await logPushDelivery(kind, ids.length, result);
   return result;
 }
 

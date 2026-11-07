@@ -60,7 +60,9 @@ async function Settings() {
         <PasskeyButton />
       </Card>
       <form action={signOut}>
-        <SubmitButton className="btn-secondary" pendingText="Signing out…">Sign out</SubmitButton>
+        <SubmitButton className="btn-secondary" pendingText="Signing out…" resetPostHog>
+          Sign out
+        </SubmitButton>
       </form>
     </>
   );

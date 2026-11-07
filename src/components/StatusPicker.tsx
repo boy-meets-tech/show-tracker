@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
+import posthog from "posthog-js";
 import { setStatus } from "@/app/actions";
 import { STATUSES, STATUS_LABEL, type WatchStatus } from "@/lib/labels";
 
@@ -12,6 +13,9 @@ export function StatusPicker({ titleId, status }: { titleId: string; status: Wat
   function choose(next: WatchStatus) {
     if (next === optimistic) return;
     startTransition(async () => {
+      if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+        posthog.capture("watch_status_changed", { status: next });
+      }
       setOptimistic(next);
       const fd = new FormData();
       fd.set("status", next);

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 
 function safeNext(next: string | null) {
@@ -33,6 +34,8 @@ export function LoginForm() {
     if (error) {
       setMessage(error.message);
       setBusy(null);
+    } else if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+      posthog.capture("login_requested", { method: "google" });
     }
   }
 
@@ -46,6 +49,9 @@ export function LoginForm() {
       );
       setBusy(null);
       return;
+    }
+    if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+      posthog.capture("login_requested", { method: "passkey" });
     }
     router.replace(next);
     router.refresh();
@@ -61,7 +67,12 @@ export function LoginForm() {
     });
     setBusy(null);
     if (error) setMessage(error.message);
-    else setSent(true);
+    else {
+      if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+        posthog.capture("login_requested", { method: "magic_link" });
+      }
+      setSent(true);
+    }
   }
 
   return (

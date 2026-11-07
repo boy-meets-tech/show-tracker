@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
+import posthog from "posthog-js";
 import { setRating } from "@/app/actions";
 
 export function RatingPicker({ titleId, rating }: { titleId: string; rating: number | null }) {
@@ -9,6 +10,9 @@ export function RatingPicker({ titleId, rating }: { titleId: string; rating: num
 
   function choose(value: number | null) {
     startTransition(async () => {
+      if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+        posthog.capture("title_rating_changed", { rating: value });
+      }
       setOptimistic(value);
       const fd = new FormData();
       fd.set("rating", value === null ? "" : String(value));

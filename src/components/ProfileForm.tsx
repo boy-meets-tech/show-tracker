@@ -1,12 +1,21 @@
 "use client";
 
 import { useActionState } from "react";
+import posthog from "posthog-js";
 import { updateProfile, type ActionState } from "@/app/actions";
 
 export function ProfileForm({ username, displayName }: { username: string; displayName: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(updateProfile, null);
   return (
-    <form action={action} className="space-y-3">
+    <form
+      action={action}
+      onSubmit={() => {
+        if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+          posthog.capture("profile_update_submitted");
+        }
+      }}
+      className="space-y-3"
+    >
       <label className="block text-sm">
         <span className="mb-1 block text-muted">Name</span>
         <input name="display_name" defaultValue={displayName} maxLength={50} className="input" required />

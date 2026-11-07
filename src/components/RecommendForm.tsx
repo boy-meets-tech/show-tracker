@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import posthog from "posthog-js";
 import { recommend, type ActionState } from "@/app/actions";
 import { Avatar } from "./Avatar";
 
@@ -19,7 +20,16 @@ export function RecommendForm({ titleId, friends }: { titleId: string; friends: 
   );
 
   return (
-    <form action={action} className="space-y-3">
+    <form
+      action={action}
+      onSubmit={(event) => {
+        const recipientCount = new FormData(event.currentTarget).getAll("friend").length;
+        if (recipientCount > 0 && process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+          posthog.capture("recommendation_submitted", { recipient_count: recipientCount });
+        }
+      }}
+      className="space-y-3"
+    >
       <div className="flex flex-wrap gap-2">
         {friends.map((f) => (
           <label
