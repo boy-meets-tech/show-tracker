@@ -36,9 +36,7 @@ export function parseTitleId(id: string): { mediaType: MediaType; tmdbId: number
   return { mediaType: match[1] as MediaType, tmdbId: Number(match[2]) };
 }
 
-export function posterUrl(path: string | null, size: "w185" | "w342" | "w500" = "w342") {
-  return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
-}
+export { posterUrl } from "./images";
 
 async function tmdb<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const key = process.env.TMDB_API_KEY;

@@ -1,4 +1,4 @@
-import { posterUrl } from "@/lib/tmdb";
+import { posterUrl } from "@/lib/images";
 
 export function Poster({
   path,
