@@ -63,7 +63,7 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
     <>
       <Card title="Invite friends">
         <p className="mb-3 text-sm text-muted">
-          Share this link. Anyone who opens it and signs in becomes your friend.
+          Share your invite link. Anyone who opens it and signs in becomes your friend.
         </p>
         {invite ? (
           <CopyInvite code={invite.code} expiresAt={invite.expires_at} />
