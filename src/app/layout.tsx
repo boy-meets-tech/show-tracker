@@ -13,6 +13,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Let the page reach the screen edges on iPhones; the nav bars then pad
+  // themselves clear of the rounded corners and home bar (safe-area insets).
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
     { media: "(prefers-color-scheme: dark)", color: "#0f0e0d" },

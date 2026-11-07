@@ -32,8 +32,8 @@ function NavView({ pathname }: { pathname: string | null }) {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-3xl items-center gap-6 px-4">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-3xl items-center gap-6 px-[max(1rem,env(safe-area-inset-left))]">
           <Link href="/" className="text-lg font-bold tracking-tight">
             Show<span className="text-accent">Tracker</span>
           </Link>
@@ -58,7 +58,7 @@ function NavView({ pathname }: { pathname: string | null }) {
           </Link>
         </div>
       </header>
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-background/95 px-[env(safe-area-inset-left)] pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
         {LINKS.map((l) => (
           <Link
             key={l.href}
