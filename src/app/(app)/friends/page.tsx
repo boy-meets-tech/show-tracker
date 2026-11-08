@@ -184,15 +184,18 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
 async function currentInvite(meId: string) {
   const supabase = await createClient();
   const cutoff = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-  return supabase
-    .from("invites")
-    .select("code, expires_at")
-    .eq("created_by", meId)
-    .is("used_at", null)
-    .gt("expires_at", cutoff)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const query = () =>
+    supabase
+      .from("invites")
+      .select("code, expires_at")
+      .eq("created_by", meId)
+      .gt("expires_at", cutoff)
+      .order("created_at", { ascending: false })
+      .limit(1);
+  const result = await query().is("used_at", null).maybeSingle();
+  // Before the single-use migration there's no used_at column (error 42703).
+  if (result.error?.code === "42703") return query().maybeSingle();
+  return result;
 }
 
 function PersonLabel({ person }: { person: ProfileRow }) {
