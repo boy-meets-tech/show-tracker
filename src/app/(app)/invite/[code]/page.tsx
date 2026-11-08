@@ -25,14 +25,16 @@ async function Invite({ params, searchParams }: PageProps<"/invite/[code]">) {
   const supabase = await createClient();
   const { data } = await supabase.rpc("invite_preview", { invite_code: code });
   const inviter = (data ?? [])[0] as
-    | { username: string; display_name: string; avatar_url: string | null }
+    | { username: string; display_name: string; avatar_url: string | null; used?: boolean }
     | undefined;
 
-  if (!inviter || error) {
+  if (!inviter || error || inviter.used) {
     return (
-      <Card title="This invite link doesn't work">
+      <Card title={inviter?.used || error ? "This invite link has already been used" : "This invite link doesn't work"}>
         <p className="text-sm text-muted">
-          It may have expired. Ask your friend for a new one, or add them by username on the{" "}
+          {inviter?.used || error
+            ? "Each invite link works for one person. If someone forwarded it to you, ask them for their own link, or find them on the "
+            : "It may have expired. Ask your friend for a new one, or find them on the "}
           <Link href="/friends" className="text-accent underline">
             Friends
           </Link>{" "}
@@ -57,12 +59,29 @@ async function Invite({ params, searchParams }: PageProps<"/invite/[code]">) {
         <h1 className="mt-4 text-xl font-bold">
           <span className="ph-mask">{inviter.display_name}</span> invited you to be friends
         </h1>
-        <p className="mt-1 text-sm text-muted">
+        <p className="ph-mask text-sm text-muted">@{inviter.username}</p>
+        <p className="mt-3 text-sm text-muted">
           You&apos;ll see what each other are watching and can swap recommendations.
         </p>
         <form action={acceptInvite.bind(null, code)} className="mt-6">
-          <SubmitButton className="btn-primary px-6 py-2.5" pendingText="Joining…" event="invite_accepted">Accept invite</SubmitButton>
+          <SubmitButton className="btn-primary px-6 py-2.5" pendingText="Joining…" event="invite_accepted">
+            Accept and become friends
+          </SubmitButton>
         </form>
+        <div className="mt-6 rounded-lg bg-surface-2 p-3 text-left text-sm">
+          <p className="font-medium">Not who you expected?</p>
+          <p className="mt-1 text-muted">
+            This link belongs to <span className="ph-mask">{inviter.display_name}</span>. If a different
+            friend forwarded it to you, don&apos;t accept: find that friend on the{" "}
+            <Link href="/friends" className="text-accent underline">
+              Friends
+            </Link>{" "}
+            page instead.
+          </p>
+        </div>
+        <Link href="/" className="mt-4 text-sm text-muted underline">
+          Not now
+        </Link>
       </div>
     </Card>
   );

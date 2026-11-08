@@ -194,6 +194,8 @@ export async function removeFriend(friendId: string) {
 export async function createInvite() {
   const me = { id: await getMyId() };
   const supabase = await createClient();
+  // Retire any unused older link so only the newest one works.
+  await supabase.from("invites").delete().eq("created_by", me.id).is("used_at", null);
   await supabase.from("invites").insert({ created_by: me.id });
   refresh();
 }

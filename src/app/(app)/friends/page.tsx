@@ -65,10 +65,22 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
     <>
       <Card title="Invite friends">
         <p className="mb-3 text-sm text-muted">
-          Share your invite link. Anyone who opens it and signs in becomes your friend.
+          Each link works for one person: whoever opens it first and accepts becomes your friend.
+          Send a new link to each friend.
         </p>
         {invite ? (
-          <CopyInvite code={invite.code} expiresAt={invite.expires_at} />
+          <>
+            <CopyInvite code={invite.code} expiresAt={invite.expires_at} />
+            <form action={createInvite} className="mt-2">
+              <SubmitButton
+                className="inline-flex items-center gap-1.5 text-xs text-muted underline hover:text-foreground"
+                pendingText="Making a new link…"
+                event="invite_link_created"
+              >
+                Make a new link (the current one stops working)
+              </SubmitButton>
+            </form>
+          </>
         ) : (
           <form action={createInvite}>
             <SubmitButton pendingText="Creating…" event="invite_link_created">Create invite link</SubmitButton>
@@ -176,6 +188,7 @@ async function currentInvite(meId: string) {
     .from("invites")
     .select("code, expires_at")
     .eq("created_by", meId)
+    .is("used_at", null)
     .gt("expires_at", cutoff)
     .order("created_at", { ascending: false })
     .limit(1)
