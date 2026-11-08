@@ -72,19 +72,18 @@ function useStickToBottom(ref: React.RefObject<HTMLElement | null>) {
         window.scrollTo(window.scrollX, window.scrollY);
         measure();
       }, 300);
+    // Only re-check when the screen size changes (keyboard opening or
+    // closing), never while scrolling: iPhone's bounce at the end of a page
+    // briefly moves everything and would make the bar jump.
     const vv = window.visualViewport;
     vv?.addEventListener("resize", measure);
-    vv?.addEventListener("scroll", measure);
     window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, { passive: true });
     window.addEventListener("focusout", afterKeyboard);
     measure();
     return () => {
       cancelAnimationFrame(frame);
       vv?.removeEventListener("resize", measure);
-      vv?.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure);
       window.removeEventListener("focusout", afterKeyboard);
     };
   }, [ref]);
