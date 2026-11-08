@@ -64,6 +64,13 @@ async function Recs() {
   const recs = (recData ?? []) as unknown as Rec[];
   const picks = (pickData ?? []) as Pick[];
   const available = await onMyServices([...recs.map((r) => r.titles.id), ...picks.map((p) => p.title_id)]);
+  // Several friends recommending the same title show as one entry (newest first).
+  const groups: Rec[][] = [];
+  for (const r of recs) {
+    const group = groups.find((g) => g[0].titles.id === r.titles.id);
+    if (group) group.push(r);
+    else groups.push([r]);
+  }
 
   return (
     <>
@@ -72,31 +79,47 @@ async function Recs() {
           <Empty>No recommendations right now.</Empty>
         ) : (
           <ul className="divide-y divide-border">
-            {recs.map((r) => (
-              <li key={r.id} className="flex items-start gap-2 py-2">
+            {groups.map((group) => {
+              const t = group[0].titles;
+              const several = group.length > 1;
+              return (
+              <li key={t.id} className="flex items-start gap-2 py-2">
                 <div className="min-w-0 flex-1">
                   <TitleRow
-                    id={r.titles.id}
-                    name={r.titles.name}
-                    posterPath={r.titles.poster_path}
-                    year={r.titles.year}
-                    mediaType={r.titles.media_type}
+                    id={t.id}
+                    name={t.name}
+                    posterPath={t.poster_path}
+                    year={t.year}
+                    mediaType={t.media_type}
                   >
                     <div className="mt-1 flex items-center gap-1.5 text-xs">
-                      <Avatar name={r.profiles.display_name} url={r.profiles.avatar_url} size={16} />
+                      <span className="flex -space-x-1.5">
+                        {group.slice(0, 3).map((r) => (
+                          <span key={r.id} className="rounded-full ring-2 ring-[var(--surface)]">
+                            <Avatar name={r.profiles.display_name} url={r.profiles.avatar_url} size={16} />
+                          </span>
+                        ))}
+                      </span>
                       <span>
-                        From <strong className="ph-mask">{r.profiles.display_name}</strong> · {timeAgo(r.created_at)}
+                        From <strong className="ph-mask">{formatNames(group.map((r) => r.profiles.display_name))}</strong> ·{" "}
+                        {timeAgo(group[0].created_at)}
                       </span>
                     </div>
-                    {r.note ? <p className="ph-mask mt-1 text-sm italic">“{r.note}”</p> : null}
-                    <ServiceBadge names={available[r.titles.id]} />
+                    {group.filter((r) => r.note).map((r) => (
+                      <p key={r.id} className="ph-mask mt-1 text-sm">
+                        {several ? <span className="font-medium">{r.profiles.display_name}: </span> : null}
+                        <span className="italic">“{r.note}”</span>
+                      </p>
+                    ))}
+                    <ServiceBadge names={available[t.id]} />
                   </TitleRow>
                 </div>
-                <form action={dismissRecommendation.bind(null, r.id)}>
+                <form action={dismissRecommendation.bind(null, t.id)}>
                   <SubmitButton event="recommendation_dismissed" className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted underline hover:text-foreground">Dismiss</SubmitButton>
                 </form>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </Card>

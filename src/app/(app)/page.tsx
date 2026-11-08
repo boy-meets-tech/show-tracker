@@ -24,7 +24,7 @@ async function Feed() {
   const me = { id: await getMyId() };
   const supabase = await createClient();
 
-  const [{ data: activity }, { count: recCount }, { count: friendCount }] = await Promise.all([
+  const [{ data: activity }, { data: recRows }, { count: friendCount }] = await Promise.all([
     supabase
       .from("activity")
       .select(ACTIVITY_SELECT)
@@ -33,12 +33,14 @@ async function Feed() {
       .limit(60),
     supabase
       .from("recommendations")
-      .select("id", { count: "exact", head: true })
+      .select("title_id")
       .eq("to_id", me.id)
       .is("dismissed_at", null),
     supabase.from("friendships").select("user_a", { count: "exact", head: true }),
   ]);
   const items = (activity ?? []) as unknown as ActivityRow[];
+  // Two friends recommending the same title counts once.
+  const recCount = new Set((recRows ?? []).map((r: { title_id: string }) => r.title_id)).size;
 
   return (
     <>

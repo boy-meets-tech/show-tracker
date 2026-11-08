@@ -138,13 +138,16 @@ export async function recommend(
   return { ok: friendIds.length === 1 ? "Sent!" : `Sent to ${friendIds.length} friends!` };
 }
 
-export async function dismissRecommendation(id: number) {
-  await getMyId();
+// Dismisses every recommendation of this title sent to you (from anyone).
+export async function dismissRecommendation(titleId: string) {
+  const me = { id: await getMyId() };
   const supabase = await createClient();
   await supabase
     .from("recommendations")
     .update({ dismissed_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("to_id", me.id)
+    .eq("title_id", titleId)
+    .is("dismissed_at", null);
   refresh();
 }
 

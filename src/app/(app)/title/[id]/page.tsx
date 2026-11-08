@@ -116,16 +116,24 @@ async function Social({ titleId }: { titleId: string }) {
   return (
     <>
       {recommendedToMe.length ? (
-        <div className="mb-6 space-y-2">
-          {recommendedToMe.map((r) => (
-            <div key={r.from_id} className="flex gap-3 rounded-xl bg-accent-soft p-3 text-sm">
-              <Avatar name={r.profiles.display_name} url={r.profiles.avatar_url} size={28} />
-              <div>
-                <strong className="ph-mask">{r.profiles.display_name}</strong> recommended this to you
-                {r.note ? <p className="ph-mask mt-0.5 italic">“{r.note}”</p> : null}
-              </div>
-            </div>
-          ))}
+        <div className="mb-6 flex gap-3 rounded-xl bg-accent-soft p-3 text-sm">
+          <div className="flex shrink-0 -space-x-2">
+            {recommendedToMe.slice(0, 3).map((r) => (
+              <span key={r.from_id} className="rounded-full ring-2 ring-[var(--accent-soft)]">
+                <Avatar name={r.profiles.display_name} url={r.profiles.avatar_url} size={28} />
+              </span>
+            ))}
+          </div>
+          <div className="min-w-0">
+            <strong className="ph-mask">{joinNames(recommendedToMe.map((r) => r.profiles.display_name))}</strong>{" "}
+            recommended this to you
+            {recommendedToMe.filter((r) => r.note).map((r) => (
+              <p key={r.from_id} className="ph-mask mt-0.5">
+                {recommendedToMe.length > 1 ? <span className="font-medium">{r.profiles.display_name}: </span> : null}
+                <span className="italic">“{r.note}”</span>
+              </p>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -187,4 +195,9 @@ async function Social({ titleId }: { titleId: string }) {
       </Card>
     </>
   );
+}
+
+function joinNames(names: string[]) {
+  if (names.length <= 2) return names.join(" and ");
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
