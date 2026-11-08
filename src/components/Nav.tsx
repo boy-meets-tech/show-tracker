@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const LINKS = [
   { href: "/", label: "Feed", icon: "M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" },
@@ -40,6 +40,57 @@ function useKeyboardOpen() {
   return useSyncExternalStore(subscribeKeyboard, keyboardOpen, () => false);
 }
 
+// After the keyboard closes, iPhone sometimes leaves the page's bottom edge
+// where the top of the keyboard was, so a bar pinned to "bottom: 0" floats
+// mid-screen. Measure where the bar really sits against the bottom of what's
+// visible, and move it down by the difference.
+function useStickToBottom(ref: React.RefObject<HTMLElement | null>) {
+  const [gap, setGap] = useState(0);
+  useEffect(() => {
+    let current = 0;
+    let frame = 0;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const el = ref.current;
+        const vv = window.visualViewport;
+        if (!el || !vv || el.getClientRects().length === 0) return; // hidden
+        const naturalBottom = el.getBoundingClientRect().bottom - current;
+        const visibleBottom = vv.offsetTop + vv.height;
+        const next = Math.round(visibleBottom - naturalBottom);
+        // Only move down onto the real bottom; ignore tiny rounding.
+        const clamped = next > 2 ? Math.min(next, 600) : 0;
+        if (clamped !== current) {
+          current = clamped;
+          setGap(clamped);
+        }
+      });
+    };
+    // Also nudge iPhone into recalculating once the keyboard has gone.
+    const afterKeyboard = () =>
+      setTimeout(() => {
+        window.scrollTo(window.scrollX, window.scrollY);
+        measure();
+      }, 300);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", measure);
+    vv?.addEventListener("scroll", measure);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("focusout", afterKeyboard);
+    measure();
+    return () => {
+      cancelAnimationFrame(frame);
+      vv?.removeEventListener("resize", measure);
+      vv?.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure);
+      window.removeEventListener("focusout", afterKeyboard);
+    };
+  }, [ref]);
+  return gap;
+}
+
 export function Nav() {
   // The current path is only known at request time, so the highlighted tab
   // streams in; the prerendered shell shows the nav without a highlight.
@@ -56,6 +107,8 @@ function NavWithPath() {
 
 function NavView({ pathname }: { pathname: string | null }) {
   const hideTabs = useKeyboardOpen();
+  const tabsRef = useRef<HTMLElement>(null);
+  const gap = useStickToBottom(tabsRef);
   const isActive = (href: string) =>
     pathname !== null && (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
@@ -87,7 +140,10 @@ function NavView({ pathname }: { pathname: string | null }) {
           </Link>
         </div>
       </header>
-      <nav className={`fixed inset-x-0 bottom-0 z-20 border-t ${hideTabs ? "hidden" : "flex"} border-border bg-background/95 px-[env(safe-area-inset-left)] pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden`}>
+      <nav className={`fixed inset-x-0 bottom-0 z-20 border-t ${hideTabs ? "hidden" : "flex"} border-border bg-background/95 px-[env(safe-area-inset-left)] pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden`}
+        ref={tabsRef}
+        style={gap ? { transform: `translateY(${gap}px)` } : undefined}
+      >
         {LINKS.map((l) => (
           <Link
             key={l.href}
