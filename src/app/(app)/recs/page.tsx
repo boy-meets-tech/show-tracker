@@ -71,6 +71,8 @@ async function Recs() {
     if (group) group.push(r);
     else groups.push([r]);
   }
+  // Titles more friends recommend come first; ties stay newest first.
+  groups.sort((a, b) => b.length - a.length);
 
   return (
     <>
@@ -78,12 +80,17 @@ async function Recs() {
         {recs.length === 0 ? (
           <Empty>No recommendations right now.</Empty>
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="space-y-1">
             {groups.map((group) => {
               const t = group[0].titles;
               const several = group.length > 1;
               return (
-              <li key={t.id} className="flex items-start gap-2 py-2">
+              <li
+                key={t.id}
+                className={`flex items-start gap-2 rounded-lg border-l-4 py-2 pr-2 pl-1 ${
+                  several ? "border-accent bg-accent-soft/60" : "border-transparent"
+                }`}
+              >
                 <div className="min-w-0 flex-1">
                   <TitleRow
                     id={t.id}
@@ -92,6 +99,11 @@ async function Recs() {
                     year={t.year}
                     mediaType={t.media_type}
                   >
+                    {several ? (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-contrast">
+                        🔥 {group.length} friends recommend this
+                      </span>
+                    ) : null}
                     <div className="mt-1 flex items-center gap-1.5 text-xs">
                       <span className="flex -space-x-1.5">
                         {group.slice(0, 3).map((r) => (
