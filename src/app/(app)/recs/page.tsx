@@ -3,6 +3,7 @@ import Link from "next/link";
 import { dismissRecommendation } from "@/app/actions";
 import { Avatar } from "@/components/Avatar";
 import { Card, Empty, PageTitle, Skeleton } from "@/components/Section";
+import { SentRecommendations } from "@/components/SentRecommendations";
 import { ServiceBadge } from "@/components/ServiceBadge";
 import { TitleRow } from "@/components/TitleRow";
 import { onMyServices } from "@/lib/watch";
@@ -17,7 +18,7 @@ export const metadata = { title: "For you" };
 export default function RecsPage() {
   return (
     <>
-      <PageTitle sub="Sent to you by friends, plus what they loved that you haven't seen.">
+      <PageTitle sub="Recommendations from friends, what they loved, and how your own picks landed.">
         For you
       </PageTitle>
       <Suspense fallback={<Skeleton rows={6} />}>
@@ -130,6 +131,10 @@ async function Recs() {
           </div>
         )}
       </Card>
+
+      <Suspense fallback={<Skeleton rows={3} />}>
+        <SentRecommendations meId={me.id} />
+      </Suspense>
     </>
   );
 }

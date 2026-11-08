@@ -236,10 +236,20 @@ const STATUS_PHRASE = {
 
 // A friend changed a status or rating. Friends who have the title on their
 // Want to watch list get "loved it" instead when the rating is 8 or more.
+const REC_PHRASE = {
+  watching: "started",
+  want: "saved to Want to watch",
+  finished: "finished",
+  dropped: "dropped",
+} as const;
+
+// recommenderIds: friends who recommended this title to the actor. They get a
+// "you recommended it" notification instead of the generic activity one.
 export async function notifyActivity(
   actorId: string,
   titleId: string,
-  change: { status: keyof typeof STATUS_PHRASE } | { rating: number }
+  change: { status: keyof typeof STATUS_PHRASE } | { rating: number },
+  recommenderIds: string[] = []
 ) {
   const db = admin();
   if (!db) return;
@@ -250,6 +260,19 @@ export async function notifyActivity(
   // One notification per friend per title: newer updates replace older ones.
   const tag = `activity-${actorId}-${titleId}`;
 
+  const recommenders = recommenderIds.filter((id) => friends.includes(id));
+  if (recommenders.length) {
+    await notify(recommenders, "recommendations", {
+      title:
+        "rating" in change
+          ? `${who} rated ${title} ${change.rating}/10`
+          : `${who} ${REC_PHRASE[change.status]} ${title}`,
+      body: "You recommended it to them.",
+      url,
+      tag,
+    });
+  }
+
   let lovers: string[] = [];
   if ("rating" in change && change.rating >= 8) {
     const { data } = await db
@@ -257,7 +280,7 @@ export async function notifyActivity(
       .select("user_id")
       .eq("title_id", titleId)
       .eq("status", "want")
-      .in("user_id", friends);
+      .in("user_id", friends.filter((id) => !recommenders.includes(id)));
     lovers = (data ?? []).map((r: { user_id: string }) => r.user_id);
     await notify(lovers, "friend_loved", {
       title: `${who} loved ${title}`,
@@ -267,7 +290,7 @@ export async function notifyActivity(
     });
   }
 
-  const others = friends.filter((id) => !lovers.includes(id));
+  const others = friends.filter((id) => !lovers.includes(id) && !recommenders.includes(id));
   await notify(others, "friend_activity", {
     title: "rating" in change ? `${who} rated ${title} ${change.rating}/10` : `${who} ${STATUS_PHRASE[change.status]} ${title}`,
     body: "Tap to see it on Show Tracker.",

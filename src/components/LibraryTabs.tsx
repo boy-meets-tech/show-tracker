@@ -18,10 +18,12 @@ export function LibraryTabs({
   entries,
   available = {},
   hasServices = false,
+  recommendedBy = {},
 }: {
   entries: EntryRow[];
   available?: Record<string, string[]>;
   hasServices?: boolean;
+  recommendedBy?: Record<string, string[]>;
 }) {
   const counts = Object.fromEntries(
     STATUSES.map((s) => [s, entries.filter((e) => e.status === s).length])
@@ -104,6 +106,14 @@ export function LibraryTabs({
                     {e.rating}/10
                   </span>
                 ) : null}
+                {recommendedBy[e.title_id] ? (
+                  <p className="mt-1 text-xs text-muted">
+                    Recommended by{" "}
+                    <span className="ph-mask font-medium text-foreground">
+                      {formatNames(recommendedBy[e.title_id])}
+                    </span>
+                  </p>
+                ) : null}
                 <div>
                   <ServiceBadge names={available[e.title_id]} />
                 </div>
@@ -114,4 +124,9 @@ export function LibraryTabs({
       </div>
     </div>
   );
+}
+
+function formatNames(names: string[]) {
+  if (names.length <= 2) return names.join(" and ");
+  return `${names[0]}, ${names[1]} and ${names.length - 2} more`;
 }

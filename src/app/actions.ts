@@ -61,7 +61,8 @@ export async function setStatus(titleId: string, formData: FormData) {
     .upsert({ user_id: me.id, title_id: titleId, status }, { onConflict: "user_id,title_id" });
   if (!error && before?.status !== status) {
     // Sends after the response, so the button doesn't wait on it.
-    after(() => notifyActivity(me.id, titleId, { status }));
+    const recommenders = await recommendersOf(me.id, titleId);
+    after(() => notifyActivity(me.id, titleId, { status }, recommenders));
   }
   refresh();
 }
@@ -93,7 +94,8 @@ export async function setRating(titleId: string, formData: FormData) {
       .insert({ user_id: me.id, title_id: titleId, status: "finished", rating });
   }
   if (rating !== null && entry?.rating !== rating) {
-    after(() => notifyActivity(me.id, titleId, { rating }));
+    const recommenders = await recommendersOf(me.id, titleId);
+    after(() => notifyActivity(me.id, titleId, { rating }, recommenders));
   }
   refresh();
 }
@@ -231,6 +233,17 @@ export async function updateProfile(_prev: ActionState, formData: FormData): Pro
   return { ok: "Saved." };
 }
 
+// Friends who recommended this title to me (to credit them on my activity).
+async function recommendersOf(meId: string, titleId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("recommendations")
+    .select("from_id")
+    .eq("to_id", meId)
+    .eq("title_id", titleId);
+  return (data ?? []).map((r: { from_id: string }) => r.from_id);
+}
+
 // --- Notifications -----------------------------------------------------------
 
 // Saves this device's notification registration. deviceId is a random id the
@@ -241,12 +254,11 @@ export async function savePushSubscription(
 ) {
   await getMyId();
   const supabase = await createClient();
-  const { error } = await supabase.rpc("save_push_subscription", {
-    sub_endpoint: sub.endpoint,
-    sub_p256dh: sub.keys.p256dh,
-    sub_auth: sub.keys.auth,
-    sub_device: deviceId && /^[A-Za-z0-9-]{8,64}$/.test(deviceId) ? deviceId : null,
-  });
+  const base = { sub_endpoint: sub.endpoint, sub_p256dh: sub.keys.p256dh, sub_auth: sub.keys.auth };
+  const device = deviceId && /^[A-Za-z0-9-]{8,64}$/.test(deviceId) ? deviceId : null;
+  let { error } = await supabase.rpc("save_push_subscription", { ...base, sub_device: device });
+  // Before the push_device_id migration the function has no device argument.
+  if (error?.code === "PGRST202") ({ error } = await supabase.rpc("save_push_subscription", base));
   if (error) throw new Error("Couldn't turn on notifications for this device.");
 }
 
