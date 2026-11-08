@@ -83,8 +83,8 @@ export function CopyInvite({ code, expiresAt }: { code: string; expiresAt: strin
         </button>
       </div>
       <p className="text-xs text-muted">
-        {copied ? "Message and link copied. Paste them anywhere. " : "Share copies your message and the link together. Works for one friend, "}
-        until{" "}
+        {copied ? "Message and link copied. Paste them anywhere. " : "Share copies your message and the link together. "}Works for one friend,
+        {" "}until{" "}
         {new Date(expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
       </p>
     </div>
