@@ -53,7 +53,32 @@ export async function SentRecommendations({ meId }: { meId: string }) {
     .order("created_at", { ascending: false })
     .limit(20);
   // Errors (before the database update) just mean there are none to show.
-  const pending = ((inviteData ?? []) as unknown as PendingInvite[]).filter((p) => p.titles);
+  const linkPending = ((inviteData ?? []) as unknown as PendingInvite[])
+    .filter((p) => p.titles)
+    .map((p) => ({ key: p.code, created_at: p.created_at, titles: p.titles, label: "Sent by link · waiting for them to join" }));
+
+  // Recommendations waiting on a friend request.
+  const { data: requestData } = await supabase
+    .from("pending_recommendations")
+    .select("to_id, title_id, created_at, to:profiles!pending_recommendations_to_id_fkey(display_name), titles(id, name, media_type, poster_path, year)")
+    .eq("from_id", meId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const requestPending = ((requestData ?? []) as unknown as {
+    to_id: string;
+    title_id: string;
+    created_at: string;
+    to: { display_name: string } | null;
+    titles: TitleRowData | null;
+  }[])
+    .filter((p) => p.titles)
+    .map((p) => ({
+      key: `${p.to_id}:${p.title_id}`,
+      created_at: p.created_at,
+      titles: p.titles,
+      label: `To ${p.to?.display_name ?? "someone"} · waiting for them to accept your friend request`,
+    }));
+  const pending = [...requestPending, ...linkPending].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const outcomes = rows.map((r) => outcomeOf(r, entries.get(`${r.to_id}:${r.title_id}`)));
   const stats = hitRate(outcomes);
@@ -63,7 +88,7 @@ export async function SentRecommendations({ meId }: { meId: string }) {
       {pending.length ? (
         <ul className="mb-4 divide-y divide-border">
           {pending.map((p) => (
-            <li key={p.code} className="py-1">
+            <li key={p.key} className="py-1">
               <TitleRow
                 id={p.titles!.id}
                 name={p.titles!.name}
@@ -72,8 +97,8 @@ export async function SentRecommendations({ meId }: { meId: string }) {
                 mediaType={p.titles!.media_type}
               >
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
-                    Sent by link · waiting for them to join
+                  <span className="ph-mask rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
+                    {p.label}
                   </span>
                   <span className="text-muted">· {timeAgo(p.created_at)}</span>
                 </div>

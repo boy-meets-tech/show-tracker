@@ -191,13 +191,15 @@ async function friendIdsOf(db: SupabaseClient, userId: string) {
   );
 }
 
-export async function notifyFriendRequest(fromId: string, toId: string) {
+export async function notifyFriendRequest(fromId: string, toId: string, titleId?: string) {
   const db = admin();
   if (!db) return;
-  const { who } = await names(db, fromId);
+  const { who, title } = await names(db, fromId, titleId);
   await notify([toId], "friend_requests", {
     title: "New friend request",
-    body: `${who} wants to be friends on Show Tracker.`,
+    body: titleId
+      ? `${who} wants to be friends and recommended ${title}. Accept to see it.`
+      : `${who} wants to be friends on Show Tracker.`,
     url: "/friends",
     tag: `request-${fromId}`,
   });

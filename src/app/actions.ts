@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { getMyId } from "@/lib/auth";
+import { getMyId, getMyIdOrNull } from "@/lib/auth";
 import { isStatus } from "@/lib/labels";
 import {
   notify,
@@ -136,6 +136,91 @@ export async function recommend(
   if (newlySent.length) after(() => notifyRecommendation(me.id, newlySent, titleId, note));
   refresh();
   return { ok: friendIds.length === 1 ? "Sent!" : `Sent to ${friendIds.length} friends!` };
+}
+
+export type PersonMatch = {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+  relation: "sent" | "received" | "none";
+};
+
+// People on Show Tracker who aren't your friends yet, for the Recommend form.
+export async function findPeople(query: string): Promise<PersonMatch[]> {
+  if (!(await getMyIdOrNull())) return [];
+  const q = query.trim().slice(0, 50);
+  if (q.replace(/^@/, "").length < 2) return [];
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("search_people", { query: q });
+  return ((data ?? []) as (Omit<PersonMatch, "relation"> & { relation: string })[])
+    .filter((p) => p.relation !== "friend")
+    .slice(0, 5) as PersonMatch[];
+}
+
+// Recommend to someone on Show Tracker who isn't your friend yet: sends a
+// friend request, and the recommendation arrives when they accept.
+export async function recommendToNewFriend(
+  titleId: string,
+  username: string,
+  note: string
+): Promise<ActionState> {
+  const me = { id: await getMyId() };
+  const cleanNote = note.trim().slice(0, 280) || null;
+  try {
+    await ensureTitle(titleId);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const supabase = await createClient();
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .eq("username", username)
+    .maybeSingle();
+  if (!target) return { error: "Couldn't find that person." };
+
+  const { data: result, error: requestError } = await supabase.rpc("send_friend_request", {
+    target_username: username,
+  });
+  if (requestError) return { error: "Couldn't send the friend request. Try again." };
+
+  if (result === "accepted" || result === "already_friends") {
+    // You're friends now (they'd already asked you), so it goes straight through.
+    const { error } = await supabase
+      .from("recommendations")
+      .upsert(
+        { from_id: me.id, to_id: target.id, title_id: titleId, note: cleanNote },
+        { onConflict: "from_id,to_id,title_id", ignoreDuplicates: true }
+      );
+    if (error) return { error: "Couldn't send that. Try again." };
+    after(async () => {
+      if (result === "accepted") await notifyNowFriends(me.id, target.id, "accepted");
+      await notifyRecommendation(me.id, [target.id], titleId, cleanNote);
+    });
+    refresh();
+    return { ok: `You're now friends with ${target.display_name}, and it's sent!` };
+  }
+
+  const { error } = await supabase
+    .from("pending_recommendations")
+    .upsert(
+      { from_id: me.id, to_id: target.id, title_id: titleId, note: cleanNote },
+      { onConflict: "from_id,to_id,title_id", ignoreDuplicates: true }
+    );
+  if (error) {
+    return {
+      error:
+        error.code === "PGRST205" || error.code === "42P01"
+          ? "Friend request sent. Recommending to non-friends needs a database update first (the SQL file)."
+          : "Friend request sent, but the recommendation didn't save. Try again.",
+    };
+  }
+  after(() => notifyFriendRequest(me.id, target.id, titleId));
+  refresh();
+  return {
+    ok: `Friend request sent to ${target.display_name}. They'll get the recommendation when they accept.`,
+  };
 }
 
 // Dismisses every recommendation of this title sent to you (from anyone).

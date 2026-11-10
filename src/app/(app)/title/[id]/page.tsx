@@ -6,7 +6,6 @@ import { Avatar } from "@/components/Avatar";
 import { Poster } from "@/components/Poster";
 import { RatingPicker } from "@/components/RatingPicker";
 import { RecommendForm } from "@/components/RecommendForm";
-import { SendToNew } from "@/components/SendToNew";
 import { StatusPicker } from "@/components/StatusPicker";
 import { WhereToWatch } from "@/components/WhereToWatch";
 import { Card, Skeleton } from "@/components/Section";
@@ -175,27 +174,16 @@ async function Social({ titleId, titleName }: { titleId: string; titleName: stri
         )}
       </Card>
 
-      <Card title="Recommend to a friend">
-        {friends.length === 0 ? (
-          <p className="text-sm text-muted">
-            <Link href="/friends" className="text-accent underline">
-              Add friends
-            </Link>{" "}
-            to send them recommendations.
-          </p>
-        ) : (
-          <RecommendForm
-            titleId={titleId}
-            friends={friends.map((f) => ({
-              ...f,
-              alreadySent: alreadySentTo.has(f.id),
-              hasLogged: theirs.some((e) => e.profiles.id === f.id),
-            }))}
-          />
-        )}
-        <div className="mt-4 border-t border-border pt-3">
-          <SendToNew titleId={titleId} titleName={titleName} />
-        </div>
+      <Card title="Recommend it">
+        <RecommendForm
+          titleId={titleId}
+          titleName={titleName}
+          friends={friends.map((f) => ({
+            ...f,
+            alreadySent: alreadySentTo.has(f.id),
+            hasLogged: theirs.some((e) => e.profiles.id === f.id),
+          }))}
+        />
       </Card>
     </>
   );

@@ -56,6 +56,15 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
     currentInvite(myId),
     q.length >= 2 ? supabase.rpc("search_people", { query: q }) : Promise.resolve({ data: null }),
   ]);
+  // Titles people recommended along with their friend request to you.
+  const { data: waitingData } = await supabase
+    .from("pending_recommendations")
+    .select("from_id, titles(name)")
+    .eq("to_id", myId);
+  const waiting = new Map<string, string[]>();
+  for (const w of (waitingData ?? []) as unknown as { from_id: string; titles: { name: string } | null }[]) {
+    if (w.titles) waiting.set(w.from_id, [...(waiting.get(w.from_id) ?? []), w.titles.name]);
+  }
   const people = (found ?? []) as PersonResult[];
   const requests = (requestData ?? []) as unknown as RequestRow[];
   const incoming = requests.filter((r) => r.to_id === me.id);
@@ -129,8 +138,15 @@ async function Friends({ searchParams }: Pick<PageProps<"/friends">, "searchPara
         <Card title="Friend requests">
           <ul className="space-y-3">
             {incoming.map((r) => (
-              <li key={r.from_id} className="flex items-center gap-3">
-                <PersonLabel person={r.from} />
+              <li key={r.from_id} className="flex flex-wrap items-center gap-3">
+                <span className="min-w-0">
+                  <PersonLabel person={r.from} />
+                  {waiting.get(r.from_id) ? (
+                    <span className="mt-1 block text-xs text-accent">
+                      Recommended you {waiting.get(r.from_id)!.join(", ")}. Accept to see it.
+                    </span>
+                  ) : null}
+                </span>
                 <form action={acceptFriendRequest.bind(null, r.from_id)} className="ml-auto">
                   <SubmitButton className="btn-primary py-1.5" event="friend_request_accepted">Accept</SubmitButton>
                 </form>
