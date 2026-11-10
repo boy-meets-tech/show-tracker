@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, TitleRowData } from "@/lib/types";
 
 type Row = SentRec & { to: ProfileRow; titles: TitleRowData };
+type PendingInvite = { code: string; created_at: string; titles: TitleRowData | null };
 
 const PILL: Record<string, string> = {
   finished: "bg-accent text-accent-contrast",
@@ -41,13 +42,48 @@ export async function SentRecommendations({ meId }: { meId: string }) {
   const entries = new Map(
     ((entryData ?? []) as FriendEntry[]).map((e) => [`${e.user_id}:${e.title_id}`, e])
   );
+  // Titles sent by link to people who haven't joined yet.
+  const { data: inviteData } = await supabase
+    .from("invites")
+    .select("code, created_at, titles(id, name, media_type, poster_path, year)")
+    .eq("created_by", meId)
+    .not("title_id", "is", null)
+    .is("used_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(20);
+  // Errors (before the database update) just mean there are none to show.
+  const pending = ((inviteData ?? []) as unknown as PendingInvite[]).filter((p) => p.titles);
+
   const outcomes = rows.map((r) => outcomeOf(r, entries.get(`${r.to_id}:${r.title_id}`)));
   const stats = hitRate(outcomes);
 
   return (
     <Card title="You recommended">
+      {pending.length ? (
+        <ul className="mb-4 divide-y divide-border">
+          {pending.map((p) => (
+            <li key={p.code} className="py-1">
+              <TitleRow
+                id={p.titles!.id}
+                name={p.titles!.name}
+                posterPath={p.titles!.poster_path}
+                year={p.titles!.year}
+                mediaType={p.titles!.media_type}
+              >
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
+                    Sent by link · waiting for them to join
+                  </span>
+                  <span className="text-muted">· {timeAgo(p.created_at)}</span>
+                </div>
+              </TitleRow>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {rows.length === 0 ? (
-        <Empty>
+        pending.length ? null : <Empty>
           Nothing yet. Open any show or movie and use &ldquo;Recommend to a friend&rdquo;.
         </Empty>
       ) : (

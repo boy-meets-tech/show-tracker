@@ -198,12 +198,12 @@ export async function createInvite() {
   const me = { id: await getMyId() };
   const supabase = await createClient();
   // Retire any unused older link so only the newest one works.
-  await supabase.from("invites").delete().eq("created_by", me.id).is("used_at", null);
+  await supabase.from("invites").delete().eq("created_by", me.id).is("used_at", null).is("title_id", null);
   await supabase.from("invites").insert({ created_by: me.id });
   refresh();
 }
 
-export async function acceptInvite(code: string) {
+export async function acceptInvite(code: string, titleId?: string) {
   const me = { id: await getMyId() };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("accept_invite", { invite_code: code });
@@ -212,7 +212,37 @@ export async function acceptInvite(code: string) {
   if (inviter && inviter.id !== me.id) {
     after(() => notifyNowFriends(me.id, inviter.id, "invite"));
   }
-  redirect(`/u/${data}`);
+  // Invites that came with a recommendation go straight to the title.
+  redirect(titleId && parseTitleId(titleId) ? `/title/${titleId}` : `/u/${data}`);
+}
+
+// A one-person invite link that also recommends this title, for someone who
+// isn't on Show Tracker yet. Returns the link's code.
+export async function createTitleInvite(
+  titleId: string,
+  note: string
+): Promise<{ code?: string; error?: string }> {
+  const me = { id: await getMyId() };
+  try {
+    await ensureTitle(titleId);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("invites")
+    .insert({ created_by: me.id, title_id: titleId, note: note.trim().slice(0, 280) || null })
+    .select("code")
+    .single();
+  if (error) {
+    return {
+      error:
+        error.code === "PGRST204" || error.code === "42703"
+          ? "This needs a database update first (the SQL file in Supabase)."
+          : "Couldn't create the link. Try again.",
+    };
+  }
+  return { code: data.code };
 }
 
 // --- Settings ----------------------------------------------------------------

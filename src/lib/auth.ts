@@ -27,6 +27,15 @@ export const getMyId = cache(async (): Promise<string> => {
   return id;
 });
 
+// The signed-in user's id, or null for visitors who aren't signed in (for the
+// few pages they can see, like an invite preview).
+export const getMyIdOrNull = cache(async (): Promise<string | null> => {
+  await connection();
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  return data?.claims?.sub ?? null;
+});
+
 // The signed-in user's full profile (name, username, photo). One extra
 // database read on top of getMyId, so use getMyId when only the id is needed.
 export const getMe = cache(async (): Promise<Profile> => {

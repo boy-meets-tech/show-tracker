@@ -34,6 +34,8 @@ export async function proxy(request: NextRequest) {
   const isPublic =
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
+    // Invite previews are shown to people who haven't joined yet.
+    pathname.startsWith("/invite/") ||
     // Phones fetch the app manifest without the sign-in cookie.
     pathname === "/manifest.webmanifest" ||
     // The notification service worker is fetched without the sign-in cookie.

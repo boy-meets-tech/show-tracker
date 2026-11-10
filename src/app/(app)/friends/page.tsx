@@ -192,10 +192,12 @@ async function currentInvite(meId: string) {
       .gt("expires_at", cutoff)
       .order("created_at", { ascending: false })
       .limit(1);
-  const result = await query().is("used_at", null).maybeSingle();
-  // Before the single-use migration there's no used_at column (error 42703).
-  if (result.error?.code === "42703") return query().maybeSingle();
-  return result;
+  // Links made for recommending a title to someone new aren't shown here.
+  const result = await query().is("used_at", null).is("title_id", null).maybeSingle();
+  // Before the database updates these columns don't exist (error 42703).
+  if (result.error?.code !== "42703") return result;
+  const unused = await query().is("used_at", null).maybeSingle();
+  return unused.error?.code === "42703" ? query().maybeSingle() : unused;
 }
 
 function PersonLabel({ person }: { person: ProfileRow }) {

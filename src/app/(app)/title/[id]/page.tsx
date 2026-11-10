@@ -6,6 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { Poster } from "@/components/Poster";
 import { RatingPicker } from "@/components/RatingPicker";
 import { RecommendForm } from "@/components/RecommendForm";
+import { SendToNew } from "@/components/SendToNew";
 import { StatusPicker } from "@/components/StatusPicker";
 import { WhereToWatch } from "@/components/WhereToWatch";
 import { Card, Skeleton } from "@/components/Section";
@@ -60,7 +61,7 @@ async function TitleContent({ params }: Pick<PageProps<"/title/[id]">, "params">
       <p className="mb-6 text-sm leading-relaxed sm:hidden">{details.overview}</p>
 
       <Suspense fallback={<Skeleton rows={3} />}>
-        <Social titleId={details.id} />
+        <Social titleId={details.id} titleName={details.name} />
       </Suspense>
 
       <p className="mt-8 text-xs text-muted">
@@ -85,7 +86,7 @@ type FriendEntry = {
   profiles: ProfileRow;
 };
 
-async function Social({ titleId }: { titleId: string }) {
+async function Social({ titleId, titleName }: { titleId: string; titleName: string }) {
   const me = { id: await getMyId() };
   const supabase = await createClient();
 
@@ -192,6 +193,9 @@ async function Social({ titleId }: { titleId: string }) {
             }))}
           />
         )}
+        <div className="mt-4 border-t border-border pt-3">
+          <SendToNew titleId={titleId} titleName={titleName} />
+        </div>
       </Card>
     </>
   );
