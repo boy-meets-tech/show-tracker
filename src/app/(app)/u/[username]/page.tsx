@@ -6,7 +6,9 @@ import { PersonAction, type Relation } from "@/components/PersonAction";
 import { Library } from "@/components/Library";
 import { Card, Empty, Skeleton } from "@/components/Section";
 import { getMyId } from "@/lib/auth";
+import { isTrustedTaste, tasteLabel } from "@/lib/recStats";
 import { createClient } from "@/lib/supabase/server";
+import { tasteStats } from "@/lib/taste";
 import type { ActivityRow, ProfileRow } from "@/lib/types";
 
 export default function ProfilePage({ params }: PageProps<"/u/[username]">) {
@@ -44,6 +46,8 @@ async function Profile({ params }: Pick<PageProps<"/u/[username]">, "params">) {
     else if (rows.length) relation = "sent";
   }
 
+  const stats = canSee ? (await tasteStats([person.id])).get(person.id) : undefined;
+
   return (
     <>
       <div className="mb-6 flex items-center gap-4">
@@ -51,6 +55,17 @@ async function Profile({ params }: Pick<PageProps<"/u/[username]">, "params">) {
         <div>
           <h1 className="ph-mask text-2xl font-bold tracking-tight">{person.display_name}</h1>
           <p className="ph-mask text-sm text-muted">@{person.username}</p>
+          {tasteLabel(stats) ? (
+            <p
+              className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                isTrustedTaste(stats) ? "bg-accent text-accent-contrast" : "bg-surface-2"
+              }`}
+            >
+              🎯 {tasteLabel(stats)}
+              {stats?.avg_rating ? ` · avg ${stats.avg_rating}/10` : ""}
+              {isTrustedTaste(stats) ? " · trusted taste" : ""}
+            </p>
+          ) : null}
         </div>
       </div>
 

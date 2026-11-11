@@ -263,7 +263,27 @@ export async function notifyActivity(
   const tag = `activity-${actorId}-${titleId}`;
 
   const recommenders = recommenderIds.filter((id) => friends.includes(id));
-  if (recommenders.length) {
+  // Finishing it or rating it 8+ is a "hit" for whoever recommended it.
+  const isHit = "rating" in change ? change.rating >= 8 : change.status === "finished";
+  if (recommenders.length && isHit) {
+    const scores = await hitCounts(db, recommenders);
+    await Promise.all(
+      recommenders.map((id) => {
+        const score = scores.get(id);
+        return notify([id], "recommendations", {
+          title:
+            "rating" in change
+              ? `🎯 ${who} loved ${title} (${change.rating}/10)`
+              : `🎯 ${who} finished ${title}`,
+          body: score
+            ? `Your recommendation landed. That's ${score.hits} hit${score.hits === 1 ? "" : "s"} out of ${score.sent}.`
+            : "Your recommendation landed.",
+          url: "/recs",
+          tag,
+        });
+      })
+    );
+  } else if (recommenders.length) {
     await notify(recommenders, "recommendations", {
       title:
         "rating" in change
@@ -298,5 +318,47 @@ export async function notifyActivity(
     body: "Tap to see it on Show Tracker.",
     url,
     tag,
+  });
+}
+
+// How many of each person's recommendations landed (finished, or rated 8+).
+async function hitCounts(db: SupabaseClient, userIds: string[]) {
+  const scores = new Map<string, { sent: number; hits: number }>();
+  const { data: recs } = await db
+    .from("recommendations")
+    .select("from_id, to_id, title_id")
+    .in("from_id", userIds);
+  const rows = (recs ?? []) as { from_id: string; to_id: string; title_id: string }[];
+  if (rows.length === 0) return scores;
+  const { data: entries } = await db
+    .from("watch_entries")
+    .select("user_id, title_id, status, rating")
+    .in("user_id", [...new Set(rows.map((r) => r.to_id))])
+    .in("title_id", [...new Set(rows.map((r) => r.title_id))]);
+  const byKey = new Map(
+    ((entries ?? []) as { user_id: string; title_id: string; status: string; rating: number | null }[]).map(
+      (e) => [`${e.user_id}:${e.title_id}`, e]
+    )
+  );
+  for (const r of rows) {
+    const score = scores.get(r.from_id) ?? { sent: 0, hits: 0 };
+    score.sent++;
+    const e = byKey.get(`${r.to_id}:${r.title_id}`);
+    if (e && (e.status === "finished" || (e.status !== "want" && (e.rating ?? 0) >= 8))) score.hits++;
+    scores.set(r.from_id, score);
+  }
+  return scores;
+}
+
+// You said a friend told you about a title: they get the credit.
+export async function notifyToldBy(meId: string, friendId: string, titleId: string) {
+  const db = admin();
+  if (!db) return;
+  const { who, title } = await names(db, meId, titleId);
+  await notify([friendId], "recommendations", {
+    title: `${who} is watching ${title} because of you`,
+    body: "They saved it to their list. You'll get the credit if they love it.",
+    url: "/recs",
+    tag: `told-${meId}-${titleId}`,
   });
 }

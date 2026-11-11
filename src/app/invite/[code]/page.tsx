@@ -23,6 +23,8 @@ type Preview = {
   title_media?: string | null;
   title_year?: number | null;
   note?: string | null;
+  for_name?: string | null; // made for one person who told the inviter about a show
+  told_title?: string | null;
 };
 
 async function preview(code: string): Promise<Preview | null> {
@@ -38,7 +40,9 @@ export async function generateMetadata({ params }: PageProps<"/invite/[code]">):
   if (!p) return { title: "You're invited" };
   const title = p.title_name
     ? `${p.display_name} recommends ${p.title_name}`
-    : `${p.display_name} invited you to Show Tracker`;
+    : p.told_title
+      ? `${p.display_name} is watching ${p.told_title} because of you`
+      : `${p.display_name} invited you to Show Tracker`;
   const description = p.note
     ? `“${p.note}” Join Show Tracker to see what your friends are watching.`
     : "Join Show Tracker to see what your friends are watching and swap recommendations.";
@@ -100,10 +104,18 @@ async function Invite({ params, searchParams }: PageProps<"/invite/[code]">) {
     <Card>
       <div className="flex flex-col items-center py-2 text-center">
         <Avatar name={inviter.display_name} url={inviter.avatar_url} size={56} />
+        {inviter.for_name ? <p className="ph-mask mt-3 text-sm text-muted">Hi {inviter.for_name}!</p> : null}
         <h1 className="mt-3 text-xl font-bold">
           <span className="ph-mask">{inviter.display_name}</span>{" "}
-          {hasTitle ? "thinks you'd love" : "invited you to be friends"}
+          {hasTitle
+            ? "thinks you'd love"
+            : inviter.told_title
+              ? `is watching ${inviter.told_title} because you told them to`
+              : "invited you to be friends"}
         </h1>
+        {!hasTitle && inviter.told_title ? (
+          <p className="mt-1 text-sm text-muted">Join to get the credit, and see if they love it.</p>
+        ) : null}
         <p className="ph-mask text-sm text-muted">@{inviter.username}</p>
 
         {hasTitle ? (

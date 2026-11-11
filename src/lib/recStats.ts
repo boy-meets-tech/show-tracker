@@ -53,7 +53,22 @@ export function hitRate(outcomes: Outcome[]) {
     sent: outcomes.length,
     started: started.length,
     finished: outcomes.filter((o) => o.kind === "finished").length,
+    // A hit: they finished it, or started it and rated it 8+.
+    hits: outcomes.filter((o) => o.kind === "finished" || ("rating" in o && (o.rating ?? 0) >= 8)).length,
     averageRating: ratings.length ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : null,
     rated: ratings.length,
   };
+}
+
+export type TasteStats = { user_id: string; sent: number; started: number; hits: number; avg_rating: number | null };
+
+// "4/5 hits": shown once someone has sent at least two recommendations.
+export function tasteLabel(stats: TasteStats | undefined) {
+  if (!stats || stats.sent < 2) return null;
+  return `${stats.hits}/${stats.sent} recs hit`;
+}
+
+// Half or more of at least three recommendations landed.
+export function isTrustedTaste(stats: TasteStats | undefined) {
+  return Boolean(stats && stats.sent >= 3 && stats.hits / stats.sent >= 0.5);
 }

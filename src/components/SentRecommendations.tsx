@@ -115,7 +115,7 @@ export async function SentRecommendations({ meId }: { meId: string }) {
         <>
           <div className="mb-4 grid grid-cols-3 gap-2 text-center">
             <Stat value={`${stats.started}/${stats.sent}`} label="started" />
-            <Stat value={String(stats.finished)} label="finished" />
+            <Stat value={String(stats.hits)} label="hits (finished or 8+)" />
             <Stat
               value={stats.averageRating !== null ? `${stats.averageRating}` : "–"}
               label={stats.rated ? `avg rating (${stats.rated})` : "avg rating"}

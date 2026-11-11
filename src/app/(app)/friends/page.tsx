@@ -209,9 +209,11 @@ async function currentInvite(meId: string) {
       .order("created_at", { ascending: false })
       .limit(1);
   // Links made for recommending a title to someone new aren't shown here.
-  const result = await query().is("used_at", null).is("title_id", null).maybeSingle();
+  const result = await query().is("used_at", null).is("title_id", null).is("for_name", null).maybeSingle();
   // Before the database updates these columns don't exist (error 42703).
   if (result.error?.code !== "42703") return result;
+  const general = await query().is("used_at", null).is("title_id", null).maybeSingle();
+  if (general.error?.code !== "42703") return general;
   const unused = await query().is("used_at", null).maybeSingle();
   return unused.error?.code === "42703" ? query().maybeSingle() : unused;
 }

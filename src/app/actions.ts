@@ -11,8 +11,10 @@ import {
   notifyFriendRequest,
   notifyNowFriends,
   notifyRecommendation,
+  notifyToldBy,
   type NotificationKind,
 } from "@/lib/push";
+import { listFriends } from "@/lib/friends";
 import { createClient } from "@/lib/supabase/server";
 import { getTitleDetails, parseTitleId } from "@/lib/tmdb";
 
@@ -233,6 +235,12 @@ export async function dismissRecommendation(titleId: string) {
     .eq("to_id", me.id)
     .eq("title_id", titleId)
     .is("dismissed_at", null);
+  await supabase
+    .from("told_me")
+    .update({ dismissed_at: new Date().toISOString() })
+    .eq("user_id", me.id)
+    .eq("title_id", titleId)
+    .is("dismissed_at", null);
   refresh();
 }
 
@@ -283,7 +291,17 @@ export async function createInvite() {
   const me = { id: await getMyId() };
   const supabase = await createClient();
   // Retire any unused older link so only the newest one works.
-  await supabase.from("invites").delete().eq("created_by", me.id).is("used_at", null).is("title_id", null);
+  // Named links (made for one person who told you about a show) are kept.
+  const { error } = await supabase
+    .from("invites")
+    .delete()
+    .eq("created_by", me.id)
+    .is("used_at", null)
+    .is("title_id", null)
+    .is("for_name", null);
+  if (error?.code === "42703") {
+    await supabase.from("invites").delete().eq("created_by", me.id).is("used_at", null).is("title_id", null);
+  }
   await supabase.from("invites").insert({ created_by: me.id });
   refresh();
 }
@@ -328,6 +346,115 @@ export async function createTitleInvite(
     };
   }
   return { code: data.code };
+}
+
+// --- Who told you ------------------------------------------------------------
+
+const NEEDS_UPDATE = "This needs a database update first (the SQL file in Supabase).";
+const missingTable = (code?: string) => code === "PGRST205" || code === "42P01" || code === "PGRST202";
+
+export type ToldResult = {
+  ok?: string;
+  error?: string;
+  // Someone not on Show Tracker: offer to invite them.
+  outside?: { id: number; name: string };
+};
+
+// "Who told you about it?" A friend's name becomes their recommendation to you
+// (they get the credit); anyone else is saved by name.
+export async function addWhoToldMe(titleId: string, rawName: string): Promise<ToldResult> {
+  const me = { id: await getMyId() };
+  const name = rawName.trim().replace(/\s+/g, " ").slice(0, 60);
+  if (!name) return { error: "Type a name." };
+  try {
+    await ensureTitle(titleId);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const supabase = await createClient();
+
+  // Keep it on your list so you don't lose it.
+  await supabase
+    .from("watch_entries")
+    .upsert(
+      { user_id: me.id, title_id: titleId, status: "want" },
+      { onConflict: "user_id,title_id", ignoreDuplicates: true }
+    );
+
+  const key = name.replace(/^@/, "").toLowerCase();
+  const friend = (await listFriends(me.id)).find(
+    (f) => f.display_name.toLowerCase() === key || f.username.toLowerCase() === key
+  );
+  if (friend) {
+    const { data: added, error } = await supabase.rpc("log_told_by_friend", {
+      p_title: titleId,
+      p_friend: friend.id,
+    });
+    if (error) return { error: missingTable(error.code) ? NEEDS_UPDATE : "Couldn't save that. Try again." };
+    if (added) after(() => notifyToldBy(me.id, friend.id, titleId));
+    refresh();
+    return { ok: added ? `${friend.display_name} gets the credit.` : `${friend.display_name} already recommended it.` };
+  }
+
+  const { data, error } = await supabase
+    .from("told_me")
+    .insert({ user_id: me.id, title_id: titleId, name })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") return { error: `${name} is already saved for this.` };
+    return { error: missingTable(error.code) ? NEEDS_UPDATE : "Couldn't save that. Try again." };
+  }
+  refresh();
+  return { ok: "Saved.", outside: { id: data.id, name } };
+}
+
+export async function removeWhoToldMe(id: number) {
+  const me = { id: await getMyId() };
+  const supabase = await createClient();
+  await supabase.from("told_me").delete().eq("id", id).eq("user_id", me.id);
+  refresh();
+}
+
+// A one-person invite for someone who told you about a show. When they join,
+// what they told you becomes their recommendation, so they get the credit.
+export async function inviteWhoToldMe(id: number): Promise<{ code?: string; error?: string }> {
+  const me = { id: await getMyId() };
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("told_me")
+    .select("name, invite")
+    .eq("id", id)
+    .eq("user_id", me.id)
+    .maybeSingle();
+  if (!row) return { error: "Couldn't find that. Reload and try again." };
+
+  // Reuse their link if it still works.
+  if (row.invite) {
+    const { data: existing } = await supabase
+      .from("invites")
+      .select("code")
+      .eq("code", row.invite)
+      .is("used_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (existing) return { code: existing.code };
+  }
+
+  const { data: invite, error } = await supabase
+    .from("invites")
+    .insert({ created_by: me.id, for_name: row.name })
+    .select("code")
+    .single();
+  if (error || !invite) return { error: "Couldn't create the link. Try again." };
+  // Link every show this person told you about to the same invite.
+  await supabase
+    .from("told_me")
+    .update({ invite: invite.code })
+    .eq("user_id", me.id)
+    .ilike("name", row.name.replace(/[%_\\]/g, (c: string) => `\\${c}`));
+  refresh();
+  return { code: invite.code };
 }
 
 // --- Settings ----------------------------------------------------------------

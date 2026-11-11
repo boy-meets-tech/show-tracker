@@ -8,6 +8,7 @@ import { RatingPicker } from "@/components/RatingPicker";
 import { RecommendForm } from "@/components/RecommendForm";
 import { StatusPicker } from "@/components/StatusPicker";
 import { WhereToWatch } from "@/components/WhereToWatch";
+import { WhoToldYou } from "@/components/WhoToldYou";
 import { Card, Skeleton } from "@/components/Section";
 import { getMyId } from "@/lib/auth";
 import { listFriends } from "@/lib/friends";
@@ -89,7 +90,7 @@ async function Social({ titleId, titleName }: { titleId: string; titleName: stri
   const me = { id: await getMyId() };
   const supabase = await createClient();
 
-  const [{ data: entries }, { data: recs }, friends] = await Promise.all([
+  const [{ data: entries }, { data: recs }, friends, { data: toldData }] = await Promise.all([
     supabase
       .from("watch_entries")
       .select("user_id, status, rating, profiles(id, username, display_name, avatar_url)")
@@ -99,7 +100,9 @@ async function Social({ titleId, titleName }: { titleId: string; titleName: stri
       .select("from_id, to_id, note, profiles!recommendations_from_id_fkey(id, username, display_name, avatar_url)")
       .eq("title_id", titleId),
     listFriends(me.id),
+    supabase.from("told_me").select("id, name").eq("user_id", me.id).eq("title_id", titleId).order("created_at"),
   ]);
+  const toldOutside = (toldData ?? []) as { id: number; name: string }[];
 
   const all = (entries ?? []) as unknown as (FriendEntry & { user_id: string })[];
   const mine = all.find((e) => e.user_id === me.id);
@@ -147,6 +150,16 @@ async function Social({ titleId, titleName }: { titleId: string; titleName: stri
             </form>
           ) : null}
         </div>
+      </Card>
+
+      <Card title="Who told you about it?">
+        <WhoToldYou
+          titleId={titleId}
+          titleName={titleName}
+          friendNames={friends.map((f) => f.display_name)}
+          fromFriends={recommendedToMe.map((r) => r.profiles)}
+          outside={toldOutside}
+        />
       </Card>
 
       <Suspense fallback={<Skeleton rows={1} />}>

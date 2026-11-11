@@ -9,6 +9,8 @@ import { TitleRow } from "@/components/TitleRow";
 import { onMyServices } from "@/lib/watch";
 import { getMyId } from "@/lib/auth";
 import { timeAgo } from "@/lib/labels";
+import { isTrustedTaste, tasteLabel, type TasteStats } from "@/lib/recStats";
+import { tasteStats } from "@/lib/taste";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, TitleRowData } from "@/lib/types";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -18,7 +20,7 @@ export const metadata = { title: "For you" };
 export default function RecsPage() {
   return (
     <>
-      <PageTitle sub="Recommendations from friends, what they loved, and how your own picks landed.">
+      <PageTitle sub="Everything your friends told you to watch, and how your own picks landed.">
         For you
       </PageTitle>
       <Suspense fallback={<Skeleton rows={6} />}>
@@ -30,6 +32,7 @@ export default function RecsPage() {
 
 type Rec = {
   id: number;
+  outside?: boolean; // someone not on Show Tracker, saved by name
   note: string | null;
   created_at: string;
   profiles: ProfileRow;
@@ -50,7 +53,7 @@ type Pick = {
 async function Recs() {
   const me = { id: await getMyId() };
   const supabase = await createClient();
-  const [{ data: recData }, { data: pickData }] = await Promise.all([
+  const [{ data: recData }, { data: pickData }, { data: toldData }] = await Promise.all([
     supabase
       .from("recommendations")
       .select(
@@ -60,8 +63,26 @@ async function Recs() {
       .is("dismissed_at", null)
       .order("created_at", { ascending: false }),
     supabase.rpc("friend_picks", { max_results: 20 }),
+    // People not on Show Tracker who told you about something.
+    supabase
+      .from("told_me")
+      .select("id, name, note, created_at, titles(id, name, media_type, poster_path, year)")
+      .eq("user_id", me.id)
+      .is("dismissed_at", null)
+      .order("created_at", { ascending: false }),
   ]);
-  const recs = (recData ?? []) as unknown as Rec[];
+  const told = ((toldData ?? []) as unknown as (Omit<Rec, "profiles"> & { name: string })[]).map(
+    (t): Rec => ({
+      ...t,
+      id: -t.id,
+      outside: true,
+      profiles: { id: `told-${t.id}`, username: "", display_name: t.name, avatar_url: null },
+    })
+  );
+  const recs = [...((recData ?? []) as unknown as Rec[]), ...told].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
+  );
+  const taste = await tasteStats(recs.filter((r) => !r.outside).map((r) => r.profiles.id));
   const picks = (pickData ?? []) as Pick[];
   const available = await onMyServices([...recs.map((r) => r.titles.id), ...picks.map((p) => p.title_id)]);
   // Several friends recommending the same title show as one entry (newest first).
@@ -78,7 +99,10 @@ async function Recs() {
     <>
       <Card title="Recommended to you">
         {recs.length === 0 ? (
-          <Empty>No recommendations right now.</Empty>
+          <Empty>
+            No recommendations right now. When someone tells you about a show, open it and add
+            them under &ldquo;Who told you about it?&rdquo;
+          </Empty>
         ) : (
           <ul className="space-y-1">
             {groups.map((group) => {
@@ -117,6 +141,7 @@ async function Recs() {
                         {timeAgo(group[0].created_at)}
                       </span>
                     </div>
+                    <TasteLine group={group} taste={taste} />
                     {group.filter((r) => r.note).map((r) => (
                       <p key={r.id} className="ph-mask mt-1 text-sm">
                         {several ? <span className="font-medium">{r.profiles.display_name}: </span> : null}
@@ -177,4 +202,24 @@ async function Recs() {
 function formatNames(names: string[]) {
   if (names.length <= 2) return names.join(" and ");
   return `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
+}
+
+// "🎯 Ariel 4/5 recs hit": how often each recommender's picks land.
+function TasteLine({ group, taste }: { group: Rec[]; taste: Map<string, TasteStats> }) {
+  const parts = group
+    .filter((r) => !r.outside)
+    .map((r) => ({ name: r.profiles.display_name, stats: taste.get(r.profiles.id) }))
+    .filter((p) => tasteLabel(p.stats));
+  if (parts.length === 0) return null;
+  return (
+    <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+      {parts.map((p) => (
+        <span key={p.name} className={isTrustedTaste(p.stats) ? "font-medium text-accent" : undefined}>
+          🎯 <span className="ph-mask">{group.length > 1 ? `${p.name} ` : ""}</span>
+          {tasteLabel(p.stats)}
+          {isTrustedTaste(p.stats) ? " · trusted taste" : ""}
+        </span>
+      ))}
+    </p>
+  );
 }
