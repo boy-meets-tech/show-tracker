@@ -11,6 +11,7 @@ import { getMyId } from "@/lib/auth";
 import { timeAgo } from "@/lib/labels";
 import { isTrustedTaste, tasteLabel, type TasteStats } from "@/lib/recStats";
 import { tasteStats } from "@/lib/taste";
+import { bothWantMatches } from "@/lib/matches";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, TitleRowData } from "@/lib/types";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -230,34 +231,12 @@ function TasteLine({ group, taste }: { group: Rec[]; taste: Map<string, TasteSta
 
 // Titles on your Want to watch list that friends want to watch too.
 async function BothWant({ meId }: { meId: string }) {
-  const supabase = await createClient();
-  const { data: mineData } = await supabase
-    .from("watch_entries")
-    .select("title_id, titles(id, name, media_type, poster_path, year)")
-    .eq("user_id", meId)
-    .eq("status", "want");
-  const mine = (mineData ?? []) as unknown as { title_id: string; titles: TitleRowData }[];
-  if (mine.length === 0) return null;
-
-  // Friends' entries are visible to you; your own are filtered out.
-  const { data: theirData } = await supabase
-    .from("watch_entries")
-    .select("title_id, profiles(id, username, display_name, avatar_url)")
-    .eq("status", "want")
-    .neq("user_id", meId)
-    .in("title_id", mine.map((m) => m.title_id));
-  const friendsByTitle = new Map<string, ProfileRow[]>();
-  for (const e of (theirData ?? []) as unknown as { title_id: string; profiles: ProfileRow }[]) {
-    friendsByTitle.set(e.title_id, [...(friendsByTitle.get(e.title_id) ?? []), e.profiles]);
-  }
-  const matches = mine
-    .filter((m) => friendsByTitle.has(m.title_id))
-    .map((m) => ({ title: m.titles, friends: friendsByTitle.get(m.title_id)! }))
-    .sort((a, b) => b.friends.length - a.friends.length);
+  // Titles more friends want come first here.
+  const matches = (await bothWantMatches(meId)).sort((a, b) => b.friends.length - a.friends.length);
   if (matches.length === 0) return null;
 
   return (
-    <Card title="🍿 You both want to watch">
+    <Card title="🍿 You both want to watch" id="both-want">
       <ul className="space-y-1">
         {matches.map(({ title: t, friends }) => (
           <li key={t.id}>

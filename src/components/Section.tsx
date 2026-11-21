@@ -7,9 +7,9 @@ export function PageTitle({ children, sub }: { children: React.ReactNode; sub?: 
   );
 }
 
-export function Card({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) {
+export function Card({ title, children, id }: { title?: React.ReactNode; children: React.ReactNode; id?: string }) {
   return (
-    <section className="mb-6 rounded-xl border border-border bg-surface p-4">
+    <section id={id} className="mb-6 scroll-mt-20 rounded-xl border border-border bg-surface p-4">
       {title ? <h2 className="mb-3 font-semibold">{title}</h2> : null}
       {children}
     </section>

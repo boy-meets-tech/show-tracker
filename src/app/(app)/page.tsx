@@ -1,8 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { ActivityItem } from "@/components/ActivityItem";
+import { Avatar } from "@/components/Avatar";
+import { Poster } from "@/components/Poster";
 import { Card, Empty, PageTitle, Skeleton } from "@/components/Section";
 import { getMyId } from "@/lib/auth";
+import { bothWantMatches } from "@/lib/matches";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityRow } from "@/lib/types";
 
@@ -59,6 +62,10 @@ async function Feed() {
         </Link>
       ) : null}
 
+      <Suspense fallback={null}>
+        <MatchStrip meId={me.id} />
+      </Suspense>
+
       {!friendCount ? (
         <Card title="Add your friends">
           <p className="text-sm text-muted">
@@ -79,5 +86,45 @@ async function Feed() {
         </ul>
       )}
     </>
+  );
+}
+
+// "You both want to watch": only shown when there are matches.
+async function MatchStrip({ meId }: { meId: string }) {
+  const matches = await bothWantMatches(meId);
+  if (matches.length === 0) return null;
+  return (
+    <section className="mb-6 rounded-xl border border-border bg-surface p-3">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold">🍿 You both want to watch</h2>
+        {matches.length > 3 ? (
+          <Link href="/recs#both-want" className="text-xs text-accent underline">
+            See all {matches.length}
+          </Link>
+        ) : null}
+      </div>
+      <ul className="grid grid-cols-3 gap-3">
+        {matches.slice(0, 3).map(({ title, friends }) => (
+          <li key={title.id}>
+            <Link href={`/title/${title.id}`} className="block">
+              <span className="relative block">
+                <Poster path={title.poster_path} name={title.name} className="w-full" />
+                <span className="absolute -right-1 -bottom-1 flex -space-x-1.5">
+                  {friends.slice(0, 2).map((f) => (
+                    <span key={f.id} className="rounded-full ring-2 ring-[var(--surface)]">
+                      <Avatar name={f.display_name} url={f.avatar_url} size={22} />
+                    </span>
+                  ))}
+                </span>
+              </span>
+              <span className="mt-1.5 block truncate text-xs font-medium">{title.name}</span>
+              <span className="ph-mask block truncate text-[11px] text-muted">
+                with {friends.length > 1 ? `${friends[0].display_name} +${friends.length - 1}` : friends[0].display_name}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
