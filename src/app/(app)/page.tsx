@@ -107,7 +107,7 @@ async function MatchStrip({ meId }: { meId: string }) {
         ) : null}
       </div>
       <ul className="grid grid-cols-3 gap-3">
-        {matches.slice(0, 3).map(({ title, friends }) => (
+        {matches.slice(0, 3).map(({ title, friends, planned }) => (
           <li key={title.id}>
             <Link href={`/title/${title.id}`} className="block">
               <span className="relative block">
@@ -121,8 +121,8 @@ async function MatchStrip({ meId }: { meId: string }) {
                 </span>
               </span>
               <span className="mt-1.5 block truncate text-xs font-medium">{title.name}</span>
-              <span className="ph-mask block truncate text-[11px] text-muted">
-                with {friends.length > 1 ? `${friends[0].display_name} +${friends.length - 1}` : friends[0].display_name}
+              <span className={`ph-mask block truncate text-[11px] ${planned ? "font-medium text-accent" : "text-muted"}`}>
+                {planned ? "✓ planned with " : "with "}{friends.length > 1 ? `${friends[0].display_name} +${friends.length - 1}` : friends[0].display_name}
               </span>
             </Link>
           </li>

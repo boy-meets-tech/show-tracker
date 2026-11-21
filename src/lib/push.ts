@@ -340,8 +340,23 @@ export async function notifyActivity(
     }
   }
 
+  // Started or finished something you planned to watch together.
+  let partners: string[] = [];
+  if ("status" in change && (change.status === "watching" || change.status === "finished")) {
+    partners = (await watchPartners(db, actorId, titleId)).filter(
+      (id) => friends.includes(id) && !recommenders.includes(id)
+    );
+    await notify(partners, "recommendations", {
+      title: `👀 ${who} ${change.status === "watching" ? "started" : "finished"} ${title}`,
+      body: "You were going to watch it together!",
+      url,
+      tag,
+    });
+  }
+
   const others = friends.filter(
-    (id) => !lovers.includes(id) && !recommenders.includes(id) && !matches.includes(id)
+    (id) =>
+      !lovers.includes(id) && !recommenders.includes(id) && !matches.includes(id) && !partners.includes(id)
   );
   await notify(others, "friend_activity", {
     title: "rating" in change ? `${who} rated ${title} ${change.rating}/10` : `${who} ${STATUS_PHRASE[change.status]} ${title}`,
@@ -397,4 +412,43 @@ function joinNames(names: string[]) {
   if (names.length <= 1) return names[0] ?? "a friend";
   if (names.length === 2) return `${names[0]} and ${names[1]}`;
   return `${names[0]}, ${names[1]} and ${names.length - 2} more`;
+}
+
+// --- Watch together ------------------------------------------------------------
+
+export async function notifyWatchAsk(fromId: string, toId: string, titleId: string) {
+  const db = admin();
+  if (!db) return;
+  const { who, title } = await names(db, fromId, titleId);
+  await notify([toId], "recommendations", {
+    title: `🍿 ${who} wants to watch ${title} with you`,
+    body: "Tap to answer: I'm in, or not this one.",
+    url: `/title/${titleId}`,
+    tag: `together-${fromId}-${titleId}`,
+  });
+}
+
+export async function notifyWatchAnswer(fromId: string, toId: string, titleId: string) {
+  const db = admin();
+  if (!db) return;
+  const { who, title } = await names(db, fromId, titleId);
+  await notify([toId], "recommendations", {
+    title: `🍿 ${who} is in for ${title}`,
+    body: "You're watching it together. Pick a night!",
+    url: `/title/${titleId}`,
+    tag: `together-${toId}-${titleId}`,
+  });
+}
+
+// Friends who agreed to watch this title with this person.
+async function watchPartners(db: SupabaseClient, userId: string, titleId: string) {
+  const { data } = await db
+    .from("watch_together")
+    .select("from_id, to_id")
+    .eq("title_id", titleId)
+    .eq("status", "in")
+    .or(`from_id.eq.${userId},to_id.eq.${userId}`);
+  return ((data ?? []) as { from_id: string; to_id: string }[]).map((r) =>
+    r.from_id === userId ? r.to_id : r.from_id
+  );
 }

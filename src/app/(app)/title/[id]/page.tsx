@@ -9,6 +9,7 @@ import { RecommendForm } from "@/components/RecommendForm";
 import { StatusPicker } from "@/components/StatusPicker";
 import { WhereToWatch } from "@/components/WhereToWatch";
 import { WhoToldYou } from "@/components/WhoToldYou";
+import { WatchTogether, type TogetherRow, type TogetherState } from "@/components/WatchTogether";
 import { Card, Skeleton } from "@/components/Section";
 import { getMyId } from "@/lib/auth";
 import { listFriends } from "@/lib/friends";
@@ -90,7 +91,7 @@ async function Social({ titleId, titleName }: { titleId: string; titleName: stri
   const me = { id: await getMyId() };
   const supabase = await createClient();
 
-  const [{ data: entries }, { data: recs }, friends, { data: toldData }] = await Promise.all([
+  const [{ data: entries }, { data: recs }, friends, { data: toldData }, { data: planData }] = await Promise.all([
     supabase
       .from("watch_entries")
       .select("user_id, status, rating, profiles(id, username, display_name, avatar_url)")
@@ -101,6 +102,8 @@ async function Social({ titleId, titleName }: { titleId: string; titleName: stri
       .eq("title_id", titleId),
     listFriends(me.id),
     supabase.from("told_me").select("id, name").eq("user_id", me.id).eq("title_id", titleId).order("created_at"),
+    // Watch-together asks you're part of (empty before the database update).
+    supabase.from("watch_together").select("from_id, to_id, status").eq("title_id", titleId),
   ]);
   const toldOutside = (toldData ?? []) as { id: number; name: string }[];
 
@@ -116,27 +119,28 @@ async function Social({ titleId, titleName }: { titleId: string; titleName: stri
   const recommendedToMe = recRows.filter((r) => r.to_id === me.id);
   const alreadySentTo = new Set(recRows.filter((r) => r.from_id === me.id).map((r) => r.to_id));
 
-  // Friends who want to watch this too.
-  const wantIt = theirs.filter((e) => e.status === "want").map((e) => e.profiles);
+  // Friends who want to watch this too, and watch-together asks.
+  const plans = (planData ?? []) as { from_id: string; to_id: string; status: "asked" | "in" | "out" }[];
+  const together: TogetherRow[] = [];
+  for (const f of friends) {
+    const mineAsk = plans.find((p) => p.from_id === me.id && p.to_id === f.id);
+    const theirAsk = plans.find((p) => p.from_id === f.id && p.to_id === me.id);
+    const wants = theirs.some((e) => e.profiles.id === f.id && e.status === "want");
+    let state: TogetherState | null = null;
+    if (mineAsk?.status === "in" || theirAsk?.status === "in") state = "in";
+    else if (theirAsk?.status === "asked") state = "asked-me";
+    else if (mineAsk?.status === "asked") state = "asked-them";
+    else if (mineAsk?.status === "out") state = "they-passed";
+    else if (wants && !theirAsk) state = "none";
+    if (state) together.push({ friend: f, state });
+  }
+  // Things to answer first, then plans, then people to ask.
+  const ORDER: Record<TogetherState, number> = { "asked-me": 0, in: 1, "asked-them": 2, none: 3, "they-passed": 4 };
+  together.sort((a, b) => ORDER[a.state] - ORDER[b.state]);
 
   return (
     <>
-      {wantIt.length ? (
-        <div className="mb-3 flex items-center gap-3 rounded-xl border border-accent bg-accent-soft p-3 text-sm">
-          <div className="flex shrink-0 -space-x-2">
-            {wantIt.slice(0, 3).map((p) => (
-              <span key={p.id} className="rounded-full ring-2 ring-[var(--accent-soft)]">
-                <Avatar name={p.display_name} url={p.avatar_url} size={28} />
-              </span>
-            ))}
-          </div>
-          <p className="min-w-0">
-            🍿 <strong className="ph-mask">{joinNames(wantIt.map((p) => p.display_name))}</strong>{" "}
-            {wantIt.length === 1 ? "wants" : "want"} to watch this
-            {mine?.status === "want" ? " too. Plan it together!" : ". Save it to watch together."}
-          </p>
-        </div>
-      ) : null}
+      {together.length ? <WatchTogether titleId={titleId} rows={together} /> : null}
       {recommendedToMe.length ? (
         <div className="mb-6 flex gap-3 rounded-xl bg-accent-soft p-3 text-sm">
           <div className="flex shrink-0 -space-x-2">

@@ -239,7 +239,7 @@ async function BothWant({ meId }: { meId: string }) {
     <Card title="🍿 Watch together" id="both-want">
       <p className="-mt-2 mb-3 text-xs text-muted">On your Want to watch list and a friend&apos;s.</p>
       <ul className="space-y-1">
-        {matches.map(({ title: t, friends }) => (
+        {matches.map(({ title: t, friends, planned }) => (
           <li key={t.id}>
             <TitleRow id={t.id} name={t.name} posterPath={t.poster_path} year={t.year} mediaType={t.media_type}>
               <div className="mt-1 flex items-center gap-1.5 text-xs">
@@ -250,8 +250,9 @@ async function BothWant({ meId }: { meId: string }) {
                     </span>
                   ))}
                 </span>
-                <span>
-                  With <strong className="ph-mask">{formatNames(friends.map((f) => f.display_name))}</strong>
+                <span className={planned ? "font-medium text-accent" : undefined}>
+                  {planned ? "✓ Planned with " : "With "}
+                  <strong className="ph-mask">{formatNames(friends.map((f) => f.display_name))}</strong>
                 </span>
               </div>
             </TitleRow>

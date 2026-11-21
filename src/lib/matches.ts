@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, TitleRowData } from "@/lib/types";
 
-export type Match = { title: TitleRowData; friends: ProfileRow[]; latest: string };
+export type Match = { title: TitleRowData; friends: ProfileRow[]; latest: string; planned: boolean };
 
 // Titles on your Want to watch list that friends want to watch too.
 // Newest match first (when a friend most recently saved it).
@@ -29,8 +29,15 @@ export async function bothWantMatches(meId: string): Promise<Match[]> {
     m.friends.push(e.profiles);
     byTitle.set(e.title_id, m);
   }
+  // Titles you've agreed to watch together (none before the database update).
+  const { data: planData } = await supabase
+    .from("watch_together")
+    .select("title_id")
+    .eq("status", "in")
+    .in("title_id", mine.map((m) => m.title_id));
+  const planned = new Set(((planData ?? []) as { title_id: string }[]).map((p) => p.title_id));
   return mine
     .filter((m) => byTitle.has(m.title_id))
-    .map((m) => ({ title: m.titles, ...byTitle.get(m.title_id)! }))
+    .map((m) => ({ title: m.titles, ...byTitle.get(m.title_id)!, planned: planned.has(m.title_id) }))
     .sort((a, b) => b.latest.localeCompare(a.latest));
 }

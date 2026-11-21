@@ -12,6 +12,8 @@ import {
   notifyNowFriends,
   notifyRecommendation,
   notifyToldBy,
+  notifyWatchAnswer,
+  notifyWatchAsk,
   type NotificationKind,
 } from "@/lib/push";
 import { listFriends } from "@/lib/friends";
@@ -455,6 +457,70 @@ export async function inviteWhoToldMe(id: number): Promise<{ code?: string; erro
     .ilike("name", row.name.replace(/[%_\\]/g, (c: string) => `\\${c}`));
   refresh();
   return { code: invite.code };
+}
+
+// --- Watch together ----------------------------------------------------------
+
+// Ask a friend to watch a title with you. If they already asked you, this
+// says yes instead.
+export async function askWatchTogether(titleId: string, friendId: string): Promise<ActionState> {
+  const me = { id: await getMyId() };
+  const supabase = await createClient();
+  const { data: theirAsk, error: readError } = await supabase
+    .from("watch_together")
+    .select("status")
+    .eq("from_id", friendId)
+    .eq("to_id", me.id)
+    .eq("title_id", titleId)
+    .maybeSingle();
+  if (missingTable(readError?.code)) return { error: NEEDS_UPDATE };
+  if (theirAsk) return answerWatchTogether(titleId, friendId, "in");
+
+  const { error } = await supabase.from("watch_together").insert({ from_id: me.id, to_id: friendId, title_id: titleId });
+  if (error && error.code !== "23505") {
+    return { error: missingTable(error.code) ? NEEDS_UPDATE : "Couldn't ask. Try again." };
+  }
+  if (!error) {
+    // Asking means you want to watch it: keep it on your list.
+    await supabase
+      .from("watch_entries")
+      .upsert(
+        { user_id: me.id, title_id: titleId, status: "want" },
+        { onConflict: "user_id,title_id", ignoreDuplicates: true }
+      );
+    after(() => notifyWatchAsk(me.id, friendId, titleId));
+  }
+  refresh();
+  return { ok: "Asked!" };
+}
+
+export async function answerWatchTogether(
+  titleId: string,
+  fromId: string,
+  answer: "in" | "out"
+): Promise<ActionState> {
+  const me = { id: await getMyId() };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("watch_together")
+    .update({ status: answer, responded_at: new Date().toISOString() })
+    .eq("from_id", fromId)
+    .eq("to_id", me.id)
+    .eq("title_id", titleId)
+    .select("status");
+  if (error || !data?.length) return { error: "Couldn't save your answer. Try again." };
+  if (answer === "in") {
+    // Make sure it's on your list too.
+    await supabase
+      .from("watch_entries")
+      .upsert(
+        { user_id: me.id, title_id: titleId, status: "want" },
+        { onConflict: "user_id,title_id", ignoreDuplicates: true }
+      );
+    after(() => notifyWatchAnswer(me.id, fromId, titleId));
+  }
+  refresh();
+  return { ok: answer === "in" ? "You're in!" : "Got it." };
 }
 
 // --- Settings ----------------------------------------------------------------

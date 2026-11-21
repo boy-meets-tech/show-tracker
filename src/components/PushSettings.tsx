@@ -14,7 +14,7 @@ type Settings = Record<NotificationKind, boolean>;
 
 const OPTIONS: { kind: NotificationKind; label: string; hint: string }[] = [
   { kind: "friend_requests", label: "Friend requests", hint: "Someone asks to be friends or accepts your request" },
-  { kind: "recommendations", label: "Recommendations", hint: "A friend recommends something to you" },
+  { kind: "recommendations", label: "Recommendations", hint: "A friend recommends something, or asks to watch something together" },
   { kind: "friend_loved", label: "Friends loved it", hint: "A friend rates 8+ something on your Want to watch list" },
   { kind: "friend_activity", label: "Friend activity", hint: "A friend starts, finishes, drops or rates something, or wants to watch the same thing as you" },
 ];
