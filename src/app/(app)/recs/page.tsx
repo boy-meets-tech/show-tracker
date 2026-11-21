@@ -161,6 +161,10 @@ async function Recs() {
         )}
       </Card>
 
+      <Suspense fallback={<Skeleton rows={2} />}>
+        <BothWant meId={me.id} />
+      </Suspense>
+
       <Card title="Your friends loved these">
         {picks.length === 0 ? (
           <Empty>
@@ -221,5 +225,59 @@ function TasteLine({ group, taste }: { group: Rec[]; taste: Map<string, TasteSta
         </span>
       ))}
     </p>
+  );
+}
+
+// Titles on your Want to watch list that friends want to watch too.
+async function BothWant({ meId }: { meId: string }) {
+  const supabase = await createClient();
+  const { data: mineData } = await supabase
+    .from("watch_entries")
+    .select("title_id, titles(id, name, media_type, poster_path, year)")
+    .eq("user_id", meId)
+    .eq("status", "want");
+  const mine = (mineData ?? []) as unknown as { title_id: string; titles: TitleRowData }[];
+  if (mine.length === 0) return null;
+
+  // Friends' entries are visible to you; your own are filtered out.
+  const { data: theirData } = await supabase
+    .from("watch_entries")
+    .select("title_id, profiles(id, username, display_name, avatar_url)")
+    .eq("status", "want")
+    .neq("user_id", meId)
+    .in("title_id", mine.map((m) => m.title_id));
+  const friendsByTitle = new Map<string, ProfileRow[]>();
+  for (const e of (theirData ?? []) as unknown as { title_id: string; profiles: ProfileRow }[]) {
+    friendsByTitle.set(e.title_id, [...(friendsByTitle.get(e.title_id) ?? []), e.profiles]);
+  }
+  const matches = mine
+    .filter((m) => friendsByTitle.has(m.title_id))
+    .map((m) => ({ title: m.titles, friends: friendsByTitle.get(m.title_id)! }))
+    .sort((a, b) => b.friends.length - a.friends.length);
+  if (matches.length === 0) return null;
+
+  return (
+    <Card title="🍿 You both want to watch">
+      <ul className="space-y-1">
+        {matches.map(({ title: t, friends }) => (
+          <li key={t.id}>
+            <TitleRow id={t.id} name={t.name} posterPath={t.poster_path} year={t.year} mediaType={t.media_type}>
+              <div className="mt-1 flex items-center gap-1.5 text-xs">
+                <span className="flex -space-x-1.5">
+                  {friends.slice(0, 3).map((f) => (
+                    <span key={f.id} className="rounded-full ring-2 ring-[var(--surface)]">
+                      <Avatar name={f.display_name} url={f.avatar_url} size={16} />
+                    </span>
+                  ))}
+                </span>
+                <span>
+                  With <strong className="ph-mask">{formatNames(friends.map((f) => f.display_name))}</strong>
+                </span>
+              </div>
+            </TitleRow>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }

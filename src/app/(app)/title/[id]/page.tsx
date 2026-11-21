@@ -116,8 +116,27 @@ async function Social({ titleId, titleName }: { titleId: string; titleName: stri
   const recommendedToMe = recRows.filter((r) => r.to_id === me.id);
   const alreadySentTo = new Set(recRows.filter((r) => r.from_id === me.id).map((r) => r.to_id));
 
+  // Friends who want to watch this too.
+  const wantIt = theirs.filter((e) => e.status === "want").map((e) => e.profiles);
+
   return (
     <>
+      {wantIt.length ? (
+        <div className="mb-3 flex items-center gap-3 rounded-xl border border-accent bg-accent-soft p-3 text-sm">
+          <div className="flex shrink-0 -space-x-2">
+            {wantIt.slice(0, 3).map((p) => (
+              <span key={p.id} className="rounded-full ring-2 ring-[var(--accent-soft)]">
+                <Avatar name={p.display_name} url={p.avatar_url} size={28} />
+              </span>
+            ))}
+          </div>
+          <p className="min-w-0">
+            🍿 <strong className="ph-mask">{joinNames(wantIt.map((p) => p.display_name))}</strong>{" "}
+            {wantIt.length === 1 ? "wants" : "want"} to watch this
+            {mine?.status === "want" ? " too. Plan it together!" : ". Save it to watch together."}
+          </p>
+        </div>
+      ) : null}
       {recommendedToMe.length ? (
         <div className="mb-6 flex gap-3 rounded-xl bg-accent-soft p-3 text-sm">
           <div className="flex shrink-0 -space-x-2">

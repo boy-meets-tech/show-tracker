@@ -312,7 +312,37 @@ export async function notifyActivity(
     });
   }
 
-  const others = friends.filter((id) => !lovers.includes(id) && !recommenders.includes(id));
+  // Saved to Want to watch, and some friends want to watch it too: a match.
+  let matches: string[] = [];
+  if ("status" in change && change.status === "want") {
+    const { data } = await db
+      .from("watch_entries")
+      .select("user_id")
+      .eq("title_id", titleId)
+      .eq("status", "want")
+      .in("user_id", friends.filter((id) => !recommenders.includes(id)));
+    matches = (data ?? []).map((r: { user_id: string }) => r.user_id);
+    if (matches.length) {
+      await notify(matches, "friend_activity", {
+        title: `🍿 You and ${who} both want to watch ${title}`,
+        body: "Plan it together.",
+        url,
+        tag: `match-${titleId}`,
+      });
+      const { data: people } = await db.from("profiles").select("display_name").in("id", matches);
+      const theirNames = (people ?? []).map((p: { display_name: string }) => p.display_name);
+      await notify([actorId], "friend_activity", {
+        title: `🍿 You and ${joinNames(theirNames)} both want to watch ${title}`,
+        body: "Plan it together.",
+        url,
+        tag: `match-${titleId}`,
+      });
+    }
+  }
+
+  const others = friends.filter(
+    (id) => !lovers.includes(id) && !recommenders.includes(id) && !matches.includes(id)
+  );
   await notify(others, "friend_activity", {
     title: "rating" in change ? `${who} rated ${title} ${change.rating}/10` : `${who} ${STATUS_PHRASE[change.status]} ${title}`,
     body: "Tap to see it on Show Tracker.",
@@ -361,4 +391,10 @@ export async function notifyToldBy(meId: string, friendId: string, titleId: stri
     url: "/recs",
     tag: `told-${meId}-${titleId}`,
   });
+}
+
+function joinNames(names: string[]) {
+  if (names.length <= 1) return names[0] ?? "a friend";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} more`;
 }
