@@ -236,7 +236,8 @@ async function BothWant({ meId }: { meId: string }) {
   if (matches.length === 0) return null;
 
   return (
-    <Card title="🍿 You both want to watch" id="both-want">
+    <Card title="🍿 Watch together" id="both-want">
+      <p className="-mt-2 mb-3 text-xs text-muted">On your Want to watch list and a friend&apos;s.</p>
       <ul className="space-y-1">
         {matches.map(({ title: t, friends }) => (
           <li key={t.id}>

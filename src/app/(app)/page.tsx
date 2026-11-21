@@ -89,14 +89,17 @@ async function Feed() {
   );
 }
 
-// "You both want to watch": only shown when there are matches.
+// "Watch together": titles on your list and a friend's. Only shown when there are some.
 async function MatchStrip({ meId }: { meId: string }) {
   const matches = await bothWantMatches(meId);
   if (matches.length === 0) return null;
   return (
     <section className="mb-6 rounded-xl border border-border bg-surface p-3">
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold">🍿 You both want to watch</h2>
+        <div>
+          <h2 className="text-sm font-semibold">🍿 Watch together</h2>
+          <p className="text-xs text-muted">On your list and a friend&apos;s</p>
+        </div>
         {matches.length > 3 ? (
           <Link href="/recs#both-want" className="text-xs text-accent underline">
             See all {matches.length}
